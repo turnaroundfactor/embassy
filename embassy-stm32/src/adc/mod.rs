@@ -163,8 +163,8 @@ pub struct AnyAdcChannel<T> {
     _phantom: PhantomData<T>,
 }
 impl_peripheral!(AnyAdcChannel<T: Instance>);
-impl<T: Instance> AdcChannel<T> for AnyAdcChannel<T> {}
-impl<T: Instance> SealedAdcChannel<T> for AnyAdcChannel<T> {
+impl<T> AdcChannel<T> for AnyAdcChannel<T> {}
+impl<T> SealedAdcChannel<T> for AnyAdcChannel<T> {
     fn channel(&self) -> u8 {
         self.channel
     }
