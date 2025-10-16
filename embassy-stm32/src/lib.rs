@@ -50,7 +50,6 @@ mod time_driver;
 pub mod timer;
 
 // Sometimes-present hardware
-
 #[cfg(adc)]
 pub mod adc;
 #[cfg(can)]
@@ -66,6 +65,9 @@ pub mod cryp;
 pub mod dac;
 #[cfg(dcmi)]
 pub mod dcmi;
+
+#[cfg(dfsdm)]
+pub mod dfsdm;
 #[cfg(dsihost)]
 pub mod dsihost;
 #[cfg(dts)]
