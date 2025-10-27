@@ -88,7 +88,48 @@ impl<'a>DfsdmChannelHandleTypeDef<'a>{
     ){
 
     }
+
+
     const F_32: u32 = 0xFFFFFFFF;
+
+
+    pub fn GPIO_INIT(&mut self){
+        //INIT GPIO A PIN
+
+        let GPIO_PIN_A_MODE  = 0x48000000;
+        let mut GPIO_PIN_A_MODE_DATA = (GPIO_PIN_A_MODE as *const u32).readvolatile();
+        const GPIO_MODE_MASK: u32 = 0x3;
+        const GPIO_PIN_5: u32 = 0x0020;
+        //clear the mode pins
+        GPIO_PIN_A_MODE_DATA &= !(GPIO_MODE_MASK << GPIO_PIN_5);
+
+        GPIO_PIN_A_MODE_DATA |= (GPIO_MODE_AF_PP << GPIO_PIN_5);
+        //mode
+        const GPIO_MODE_PP: u32 = 0x0<<4;
+        const GPIO_MODE_AF: u32 = 0x2<<0;
+        const GPIO_MODE_AF_PP: u32 = GPIO_MODE_PP|GPIO_MODE_AF;
+        (GPIO_PIN_A_MODE as *mut u32).write_volatile(GPIO_PIN_A_MODE_DATA);
+
+        //no pull
+        const GPIO_NO_PULL: u32 = 0x0;
+
+        //sset the speed as slow
+        let GPIO_PIN_A_SPEED  = 0x48000008;
+        let mut GPIO_PIN_A_SPEED_DATA = (GPIO_PIN_A_SPEED as *const u32).readvolatile();
+        const SPEED_FREQ_MASK: u32 = 0x3;
+        const GPIO_SPEED_FREQ_LOW: u32= 0x0;
+        GPIO_PIN_A_SPEED_DATA &= !((SPEED_FREQ_MASK)<<GPIO_PIN_5);
+        (GPIO_PIN_A_SPEED as *mut u32).write_volatile(GPIO_PIN_A_SPEED_DATA);
+
+        let GPIO_PIN_A_AF  = 0x48000020;
+        let mut GPIO_PIN_A_AF_DATA = (GPIO_PIN_A_AF as *const u32).readvolatile();
+        const GPIO_AF_MASK: u32 = 0xF;
+        const GPIO_AF6_DFSDM1: u32 = 0x6;
+        GPIO_PIN_A_AF_DATA &= !((GPIO_AF_MASK)<<20);
+        GPIO_PIN_A_AF_DATA |= GPIO_AF6_DFSDM1 << 20;
+        (GPIO_PIN_A_AF as *mut u32).write_volatile(GPIO_PIN_A_AF_DATA);
+
+    }
     pub fn DFSM_Clock_Select( &mut self) {
         //clear the bit for dfsdm
         let RCC_CCIPR = 0x88;
