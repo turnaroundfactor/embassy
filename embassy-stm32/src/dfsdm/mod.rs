@@ -1,7 +1,7 @@
 //! Discrete Filter for Delta Sigma Converter (DFSDM)
 //! check if i can push
 #![macro_use]
-
+#[cfg(dfsdm)]
 mod _version;
 use embassy_hal_internal::{Peri,SetConfig};
 pub mod defines;
