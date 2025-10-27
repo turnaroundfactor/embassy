@@ -5,19 +5,11 @@
 mod _version;
 use embassy_hal_internal::{Peri,SetConfig};
 pub mod defines;
-use crate::rcc::{RccInfo, SealedRccPeripheral};
-use crate::gpio::{AnyPin, SealedPin as _};
-use crate::mode::Mode as PeriMode;
 use crate::time::Hertz;
 use embassy_time::Delay;
 use embedded_hal::delay::DelayNs;
-use embassy_stm32::pac::rcc;
 
 
-pub(crate) struct Info {
-    pub(crate) regs: Regs,
-    pub(crate) rcc: RccInfo,
-}
 pub enum HAL_DFSDM_Channel_StateTypeDef{
     DFSDM_CHANNEL_STATE_REST = 0x00,
     DFSDM_CHANNEL_STATE_READY = 0x01,
@@ -72,23 +64,14 @@ pub struct DfsdmChannelHandleTypeDef {
     pub dfsdm_instance: DFSDM_Channel_TypeDef,
     pub Init: DFSDM_Channel_InitTypeDef,
     pub State: HAL_DFSDM_Channel_StateTypeDef,
-    pub _peri:Peri<'a,T>,
-    pub clk: Peri<'a,AnyPin>,
-    pub data: Peri<'a,AnyPin>,
 
 }
 // Memory map of DFSDM1 = 0x4001 6000 - 0x4000 63FF
 impl<'a>DfsdmChannelHandleTypeDef<'a>{
 
-    pub fn new<T:Instance>(
-        info: T::info(),
-        _peri:Peri<'a,T>,
-        clk: Peri<'a,AnyPin>,
-        data: Peri<'a,AnyPin>,
-    ){
+    pub fn new<T:Instance>(){
 
     }
-
 
     const F_32: u32 = 0xFFFFFFFF;
 
