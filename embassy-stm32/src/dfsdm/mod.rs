@@ -9,7 +9,8 @@ use crate::rcc::{RccInfo, SealedRccPeripheral};
 use crate::gpio::{AnyPin, SealedPin as _};
 use crate::mode::Mode as PeriMode;
 use crate::time::Hertz;
-
+use embassy_time::Delay;
+use embedded_hal::delay::DelayNs;
 use embassy_stm32::pac::rcc;
 
 
@@ -76,7 +77,7 @@ pub struct DfsdmChannelHandleTypeDef {
     pub data: Peri<'a,AnyPin>,
 
 }
-
+// Memory map of DFSDM1 = 0x4001 6000 - 0x4000 63FF
 impl<'a>DfsdmChannelHandleTypeDef<'a>{
 
     pub fn new<T:Instance>(
@@ -87,134 +88,187 @@ impl<'a>DfsdmChannelHandleTypeDef<'a>{
     ){
 
     }
+    const F_32: u32 = 0xFFFFFFFF;
     pub fn DFSM_Clock_Select( &mut self) {
         //clear the bit for dfsdm
+        let RCC_CCIPR = 0x88;
+        let mut RCC_CCIPR_DATA = (RCC_CCIPR as *const u32).readvolatile();
         const RCC_DFSDM1CLKSOURCE_PCLK: u64 = 0x0;
         const RCC_CCIPR_DFSDM1SELL_CLEAR: u64 = 0x80000000;
-        //RCC->CCIPR &= ~(RCC_CCIPR_DFSDM1SELL_CLEAR);
+        RCC_CCIPR_DATA &= (RCC_CCIPR_DFSDM1SELL_CLEAR ^ F_32);
         //select the clock mux as PCLK
-        //RCC->CCIPR |= RCC_DFSDM1CLKSOURCE_PCLK;
+        RCC_CCIPR_DATA |= RCC_DFSDM1CLKSOURCE_PCLK;
+
+        (RCC_CCIPR as *mut u32).write_volatile(RCC_CCIPR_DATA);
+
 
         //bit to enable the clock
+        let RCC_APB2ENR = 0x60;
+        let mut RCC_APB2ENR_DATA = (RCC_APB2ENR as *const u32).readvolatile();
         const RCC_APB2ENR_DFSDM1EN: u64 = 0x01000000;
         //enable the clock
-        //RCC->APB2ENR |= RCC_APB2ENR_DFSDM1EN;
+        RCC_APB2ENR_DATA |= RCC_APB2ENR_DFSDM1EN;
+
+        (RCC_APB2ENR as *mut u32).write_volatile(RCC_APB2ENR_DATA);
     }
 
 
     pub fn DFSDM_FilterInit( &mut self) {
+
+        //FLTCR1 = 0x40016000 = + 0x100 + 0x80*x x = 0
+        FLTCR1 = 0x40016100;
+        let mut FLTCR1_DATA = (FLTCR1 as *const u32).readvolatile();
         const DFSDM_FLTCR1_RSYNC: u64 = 0x00080000;
-        //FLTCR1 &= ~DFSDM_FLTCR1_RSYNC;
+        FLTCR1_DATA &= (DFSDM_FLTCR1_RSYNC^ F_32);
         const DFSDM_FLTCR1_FAST: u64 = 0x20000000;
-        //FLTCR1 &= ~DFSDM_FLTCR1_FAST; //fast mode disabled
+        FLTCR1_DATA &= (DFSDM_FLTCR1_FAST ^ F_32); //fast mode disabled
         const DFSDM_FLTCR1_RDMAEN: u64 = 0x00200000;
-        //FLTCR1 &= ~DFSDM_FLTCR1_RDMAEN;
+        FLTCR1_DATA &= (DFSDM_FLTCR1_RDMAEN ^ F_32);
 
 
         //clear all injected params
         const DFSDM_FLTCR1_JSYNC: u64 = 0x00000008;
         const DFSDM_FLTCR1_JEXTEN: u64 = 0x00006000;
         const DFSDM_FLTCR1_JEXTSEL: u64 = 0x00000700;
-        //FLTCR1 &= ~(DFSDM_FLTCR1_JSYNC | DFSDM_FLTCR1_JEXTEN | DFSDM_FLTCR1_JEXTSEL);
+        FLTCR1_DATA &= !(DFSDM_FLTCR1_JSYNC | DFSDM_FLTCR1_JEXTEN | DFSDM_FLTCR1_JEXTSEL);
 
         const DFSDM_FLTCR1_JSCAN: u64 = 0x00000010;
-        //FLTCR1 &=  ~DFSDM_FLTCR1_JSCAN;
+        FLTCR1_DATA &=  !DFSDM_FLTCR1_JSCAN;
         const DFSDM_FLTCR1_JDMAEN: u64 = 0x00000020;
-        //FLTCR1 &= ~(DFSDM_FLTCR1_JDMAEN);
+        FLTCR1_DATA != !(DFSDM_FLTCR1_JDMAEN);
+
+        (FLTCR1 as *mut u32).write_volatile(FLTCR1_DATA);
 
 
+
+        //FLTxFCR = 0x40016000 + 0x114 + 0x80*x x= 0
+        let FLT0FCR = 0x40016114;
         //clear the paramters
+        let mut FLT0FCR_DATA = (FLT0FCR as *const u32).readvolatile();
         const DFSDM_FLTFCR_FORD: u64 = 0xE0000000;
         const DFSDM_FLTFCR_FOSR: u64 = 0x03FF0000;
         const DFSDM_FLTFCR_IOSR: u64 = 0x000000FF;
-        //FLTFCR &= ~(DFSDM_FLTFCR_FORD | DFSDM_FLTFCR_FOSR | DFSDM_FLTFCR_IOSR);
+        FLT0FCR_DATA &= !(DFSDM_FLTFCR_FORD | DFSDM_FLTFCR_FOSR | DFSDM_FLTFCR_IOSR);
         //inject the parameters
         const DFSDM_FILTER_FASTSINC_ORDER: u64 = 0x0;
         const OVERSAMPLING: u64 = 100;
         const IntOversampling: u64 = 70;
         const DFSDM_FLTFCR_FOSR_Pos: u64 = 16;
-        //FLTFCR |= (SincOrder | ((OVERSAMPLING - 1) <<DFSDM_FLTFCR_FOSR_Pos) | (IntOversampling - 1);
+        FLT0FCR_DATA |= (DFSDM_FILTER_FASTSINC_ORDER | ((OVERSAMPLING - 1) <<DFSDM_FLTFCR_FOSR_Pos) | (IntOversampling - 1));
+
+        (FLT0FCR as *mut u32).write_volatile(FLT0FCR_DATA);
+
+
+
 
         //enable DFSDM Filter
         const DFSDM_FLTCR1_DFEN: u64 = 0x00000001;
-        //FLTCR1 |= DFSDM_FLTCR1_DFEN;
+
+        FLTCR1_DATA = (FLTCR1 as *const u32).readvolatile();
+        FLTCR1_DATA |= DFSDM_FLTCR1_DFEN;
+        (FLTCR1 as *mut u32).write_volatile(FLTCR1_DATA);
+
     }
     pub fn DFSDM_ChannelInnit(&mut self,){
         // Need to set the clock for it
+
+        //CHyCFGR1 = 0x40016000 + 0x00 + 0x20 * y
+        let CH0CFGR1 = 0x40016000;
         //reset clock mask
+        CH0CFGR1_DATA = (CH0CFGR1 as *const u32).readvolatile();
         const DFSDM_CHCFGR1_CKOUTDIV: u64 = 0x40000000;
         const DFSDM_CHANNEL_OUTPUT_CLOCK_SYSTEM:  u64 = 0x0;
-        //DFSDM1_Channel0->CHCFGR1 &= ~(DFSDM_CHCFGR1_CKOUTDIV);
-        // DFSDM1_Channel0->CHCFGR1 |= DFSDM_CHANNEL_OUTPUT_CLOCK_SYSTEM
+        CH0CFGR1_DATA &= !(DFSDM_CHCFGR1_CKOUTDIV);
+        CH0CFGR1_DATA |= DFSDM_CHANNEL_OUTPUT_CLOCK_SYSTEM;
 
         //reset clock divider
         const DFSDM_CHCFGR1_CKOUTDIV: u64 = 0x00FF0000;
         const DIVIDER: u64 = 0x2;
         const DIVIDER_SHIFT: u32 = 16;
-        //DFSDM1_channel0->CHCFGR1 &= ~(DFSDM_CHCFGR1_CKOUTDIV);
-        //DFSDM1_Channel0->CHCFGR1 |= ((DIVIDER- 1U) <<
-        //                                              DIVIDER_SHIFT);
+        CH0CFGR1_DATA &= !(DFSDM_CHCFGR1_CKOUTDIV);
+        CH0CFGR1_DATA |= ((DIVIDER- 1) << DIVIDER_SHIFT);
         const DFSDM_CHCFGR1_DFSDMEN: u64 = 0x80000000;
         //enable the global interface
-        //DFSDM1_Channel0->CHCFGR1 |= DFSDM_CHCFGR1_DFSDMEN;
+        CH0CFGR1_DATA |= DFSDM_CHCFGR1_DFSDMEN;
+
 
         //clear channel input paramters
         const DFSDM_CHCFGR1_DATPACK: u64 = 0x0000C000;
         const DFSDM_CHCFGR1_DATMPX: u64 = 0x00003000;
         const DFSDM_CHCFGR1_CHINSEL: u64 = 0x00000100;
-        //CHCFGR1 &= DFSDM_CHCFGR1_DATPACK | DFSDM_CHCFGR1_DATMPX | DFSDM_CHCFGR1_CHINSEL
+        CH0CFGR1_DATA &= !(DFSDM_CHCFGR1_DATPACK | DFSDM_CHCFGR1_DATMPX | DFSDM_CHCFGR1_CHINSEL);
         //set the input params
         const DFSDM_CHANNEL_EXTERNAL_INPUTS: u64 = 0x0;
         const DFSDM_CHANNEL_STANDARD_MODE: u64 = 0x0;
         const DFSDM_CHANNEL_SAME_CHANNEL_PINS: u64 = 0x0;
-        //CHCFGR1 = DFSDM_CHANNEL_EXTERNAL_INPUTS | DFSDM_CHANNEL_STANDARD_MODE | DFSDM_CHANNEL_SAME_CHANNEL_PINS
+        CH0CFGR1_DATA = DFSDM_CHANNEL_EXTERNAL_INPUTS | DFSDM_CHANNEL_STANDARD_MODE | DFSDM_CHANNEL_SAME_CHANNEL_PINS;
 
         //set serial interface params
         const DFSDM_CHCFGR1_SITP: u64 = 0x00000003;
         const DFSDM_CHCFGR1_SPICKSEL: u64 = 0x0000000C;
-        //CHCFGR1 &=~(DFSDM_CHCFGR1_SITP | DFSDM_CHCFGR1_SPICKSEL)
+        CH0CFGR1_DATA &= !(DFSDM_CHCFGR1_SITP | DFSDM_CHCFGR1_SPICKSEL);
 
         const DFSDM_CHANNEL_SPI_RISING: u64 = 0x0;
         const DFSDM_CHANNEL_SPI_CLOCK_INTERNAL: u64 = 0x00000004;
-        //CHCFGR1 |= (DFSDM_CHANNEL_SPI_RISING |DFSDM_CHANNEL_SPI_CLOCK_INTERNAL);
+        CH0CFGR1_DATA |= (DFSDM_CHANNEL_SPI_RISING |DFSDM_CHANNEL_SPI_CLOCK_INTERNAL);
 
+
+        (CH0CFGR1 as *mut u32).write_volatile(CH0CFGR1_DATA);
         //analog watchdog
+        //CHyAWSCDR = 0x40016000 + 0x08 + 0x20*y
+        let CH0AWSCDR = 0x40016008;
+        let mut CH0AWSCDR_DATA = (CH0AWSCDR as *const u32).read_volatile();
         const DFSDM_CHAWSCDR_AWFORD: u64 = 0x00C00000;
         const DFSDM_CHAWSCDR_AWFOSR: u64 = 0x001F0000;
-        //CHAWSCDR &= ~(DFSDM_CHAWSCDR_AWFORD | DFSDM_CHAWSCDR_AWFOSR);
+        CH0AWSCDR_DATA &= !(DFSDM_CHAWSCDR_AWFORD | DFSDM_CHAWSCDR_AWFOSR);
         const DFSDM_CHANNEL_FASTSINC_ORDER: u64 = 0x0;
         const OVERSAMPLING: u64 = 0x1;
         const DFSDM_CHAWSCDR_AWFOSR_Pos: u64 = 16;
-        //CHAWSCDR |= (hdfsdm_channel->Init.Awd.FilterOrder |
-        //    ((hdfsdm_channel->Init.Awd.Oversampling - 1U) << DFSDM_CHAWSCDR_AWFOSR_Pos));
+        CH0AWSCDR_DATA |= (DFSDM_CHANNEL_FASTSINC_ORDER |
+            ((OVERSAMPLING - 1) << DFSDM_CHAWSCDR_AWFOSR_Pos));
+
+
+        //CHyCFGR2 = 0x40016000 + 0x04 + 0x20 * y, (y = 0 to 7)
+        let CH0CFGR2 = 0x40016004;
+        let mut CH0CFGR2_DATA = (CH0CFGR2 as *const u32).read_volatile();
         const DFSDM_CHCFGR2_OFFSET: u64 = 0x001F0000;
         const DFSDM_CHCFGR2_DTRBS: u64 = 0x000000F8;
         //offset and right bit shift
-        //CHCFGR2 &= ~(DFSDM_CHCFGR2_OFFSET | DFSDM_CHCFGR2_DTRBS);
+        CH0CFGR2_DATA &= !(DFSDM_CHCFGR2_OFFSET | DFSDM_CHCFGR2_DTRBS);
+
 
         const DFSDM_CHCFGR2_OFFSET_Pos: u64 = 8;
         const DFSDM_CHCFGR2_DTRBS_Pos: u64 = 3;
         const OFFSET:  u64 = 0x0;
         const RIGHT_BIT_SHIFT: u64 = 0x0;
-        //CHCFGR2 |= (OFFSET << DFSDM_CHCFGR2_OFFSET_Pos) |(RIGHT_BIT_SHIFT << DFSDM_CHCFGR2_DTRBS_Pos);
+        CH0CFGR2_DATA |= (OFFSET << DFSDM_CHCFGR2_OFFSET_Pos) |(RIGHT_BIT_SHIFT << DFSDM_CHCFGR2_DTRBS_Pos);
 
+        (CH0CFGR2 as *mut u32).write_volatile(CH0CFGR2_DATA);
+        //CHyCFGR1 = 0x40016000 + 0x00 + 0x20 * y
+        //CH0CFGR1 = 0x40016000
         const DFSDM_CHCFGR1_CHEN: u64 = 0x00000080;
-        //CHCFGR1 |=DFSDM_CHCFGR1_CHEN;
+        CH0CFGR1_DATA |=DFSDM_CHCFGR1_CHEN;
+        (CH0CFGR1 as *mut u32).write_volatile(CH0CFGR1_DATA);
     }
 
 
     pub fn HAL_DFSDM_FilterConfig_RegChannel(&mut self){
         //set the filter into contiunous mode
+
+        //FLTyCR1 = 0x40016000 + 0x100 + 0x80 * y
+        let FLT0CR1 = 0x40016100;
+        let mut FLT0CR1_DATA = (FLT0CR1 as *const u32).readvolatile();
         const DFSDM_FLTCR1_RCH: u64 =0x07000000;
         const DFSDM_FLTCR1_RCONT: u64 =0x00040000;
         //clear the bits first
-        //FLTCR1 &= ~(DFSDM_FLTCR1_RCH|DFSDM_FLTCR1_RCONT);
+        FLT0CR1_DATA &= !(DFSDM_FLTCR1_RCH|DFSDM_FLTCR1_RCONT);
         const DFSDM_MSB_MASK: u64 = 0xFFFF0000;
         const Channel: u64 = 0x00000001;
         const DFSDM_FLTCR1_MSB_RCH_OFFSET: u64 = 8;
         const DFSDM_FLTCR1_RCONT: u64 = 0x00040000;
-        //FLTCR1 |=  (((Channel & DFSDM_MSB_MASK) << DFSDM_FLTCR1_MSB_RCH_OFFSET) |
-        //                                                     DFSDM_FLTCR1_RCONT)
+        FLT0CR1_DATA |=  (((Channel & DFSDM_MSB_MASK) << DFSDM_FLTCR1_MSB_RCH_OFFSET) | DFSDM_FLTCR1_RCONT);
+
+        (FLT0CR1 as *mut u32).write_volatile(FLT0CR1_DATA);
 
     }
 
@@ -223,29 +277,51 @@ impl<'a>DfsdmChannelHandleTypeDef<'a>{
     //in an idle state
     pub fn DFSDM_Filter_Regular_Start(&mut self,) {
         //software start of regular conversion
-        const DFSDM_FLTCR1_RSWSTART: u64 = 0x00020000;
-        //FLTCR1 |= DFSDM_FLTCR1_RSWSTART
+        //FLTyCR1 = 0x40016000 + 0x100 + 0x80 * y
+        let FLT0CR1 = 0x40016100;
+        const DFSDM_FLTCR1_RSWSTART: u32 = 0x00020000;
+        let mut FLT0CR1_DATA = (FLT0CR1 as *const u32).readvolatile();
+        (FLT0CR1 as *mut u32).write_volatile(FLT0CR1_DATA);
     }
 
-    pub fn DFSDM_PollConversion(&mut self,) {
+    pub fn DFSDM_PollConversion(&mut self,)->bool {
+        //FLTxISR = 0x40016000 + 0x108 + 0x80 * y
+        let FLT0ISR = 0x40016108;
+        let mut FLT0ISR_DATA = (FLT0ISR as *const u32).read_volatile();
         const DFSDM_FLTISR_REOCF: u64 =0x00000002;
-        //while(FLTISR & DFSDM_FLTISR_REOCF != DFSDM_FLTISR_REOCF)
-        //{
-            //keep waiting but only for x amount of time
-        //}
+        let mut tries = 0;
+        while((FLT0ISR_DATA & DFSDM_FLTISR_REOCF) != DFSDM_FLTISR_REOCF)
+        {
+            Delay.delay_ms(2000);
+            tries = tries + 1;
+            if(tries == 5) {
+                break;
+            }
+            FLT0ISR_DATA = (FLT0ISR as *const u32).read_volatile();
+        }
         const DFSDM_FLTISR_ROVRF: u64 = 0x00000008;
-        //if FLTISR & DFSDM_FLTISR_ROVRF == DFSDM_FLTISR_ROVRF
-        //call an error function?
-        //return ok if no errors
+        if (FLT0ISR_DATA & DFSDM_FLTISR_ROVRF == DFSDM_FLTISR_ROVRF){
+            return false;
+        }
+        else{
+            return true;
+        }
+
     }
 
-    pub fn DFSDM_Reg_ChannelConversion(&mut self,) {
-        const DFSDM_FLTRDATAR_RDATACH: u64 = 0x00000007;
+    pub fn DFSDM_Reg_ChannelConversion(&mut self,)->u32 {
+
+        //FLTxRDATAR = 0x40016000 + 0x11C + 0x80 * x, (x = 0 to 3)
+        let FLT0RDATAR = 0x4001611C;
+        let mut FLT0RDATAR_DATA = (FLT0RDATAR as *const u32).read_volatile();
+        const DFSDM_FLTRDATAR_RDATACH: u32 = 0x00000007;
+        const DFSDM_FLTRDATAR_RDATA: u32 = 0xFFFFFF00;
         //let mut u32 reg = FLTRDATAR;
-            //DFSDM1_Channel0 = reg & DFSDM_FLTRDATAR_RDATACH;
-        //reg &= DFSDM_FLTRDATAR_RDATACH;
-        // let mut ret_val = reg/256;
-        //return ret_val;
+        //DFSDM1_Channel0 = reg & DFSDM_FLTRDATAR_RDATACH;
+
+        FLT0RDATAR_DATA &= DFSDM_FLTRDATAR_RDATA;
+        FLT0RDATAR_DATA = FLT0RDATAR_DATA/256; //bit shift value down
+        return FLT0RDATAR_DATA;
 
 
     }
