@@ -67,6 +67,7 @@ pub struct DfsdmChannelHandleTypeDef {
 
 }
 // Memory map of DFSDM1 = 0x4001 6000 - 0x4000 63FF
+#[cfg(any(dfsdm))]
 impl<'a>DfsdmChannelHandleTypeDef<'a>{
 
     pub fn new<T:Instance>(){
