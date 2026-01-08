@@ -1060,7 +1060,9 @@ pub(crate) unsafe fn init(config: Config) {
         ic10: None,
         ic14: None,
         ic15: None,
+        ic16: None,
         ic17: None,
+        ic19: None,
         ic20: None,
     );
 }
