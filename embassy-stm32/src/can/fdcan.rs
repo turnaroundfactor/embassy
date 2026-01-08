@@ -10,7 +10,7 @@ use embassy_sync::channel::Channel;
 use embassy_sync::waitqueue::AtomicWaker;
 
 use crate::can::fd::peripheral::Registers;
-use crate::gpio::{AfType, OutputType, Pull, SealedPin as _, Speed};
+use crate::gpio::{AfType, OutputType, Pull, SealedPin as _, Speed, PinNumber};
 use crate::interrupt::typelevel::Interrupt;
 use crate::rcc::{self, RccPeripheral};
 use crate::{Peri, interrupt, peripherals};
@@ -865,8 +865,8 @@ struct State {
     pub ns_per_timer_tick: u64,
     receiver_instance_count: usize,
     sender_instance_count: usize,
-    tx_pin_port: Option<u8>,
-    rx_pin_port: Option<u8>,
+    tx_pin_port: Option<PinNumber>,
+    rx_pin_port: Option<PinNumber>,
     automatic_bus_off_recovery: Option<bool>, // controlled by CanConfigurator::start()
     pub err_waker: AtomicWaker,
 }
