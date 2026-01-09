@@ -655,7 +655,7 @@ fn init_pll(pll_config: Option<Pll>, pll_index: usize, input: &PllInput) -> PllO
                 w.set_pllpdiven(true);
             });
             // enable the pll
-            RCC.csr().write(|w| w.pllons(pll_index));
+            RCC.csr().write(|w| w.set_pllons(pll_index, true));
             // wait until ready
             while RCC.sr().read().pllrdy(pll_index) {}
 
@@ -909,7 +909,7 @@ fn init_osc(config: Config) -> OscOutput {
 
             *out = init_pll(pll, n, &pll_input);
         } else if pll.is_some() && !pll_ready {
-            RCC.csr().write(|w| w.pllons(n));
+            RCC.csr().write(|w| w.set_pllons(n, true));
             while !RCC.sr().read().pllrdy(n) {}
         }
     }
