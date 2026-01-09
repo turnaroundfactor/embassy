@@ -63,8 +63,8 @@ impl CpuClk {
 
 #[derive(Clone, Copy, PartialEq)]
 pub struct IcConfig {
-    source: Icsel,
-    divider: Icint,
+    pub source: Icsel,
+    pub divider: Icint,
 }
 
 #[derive(Clone, Copy, PartialEq)]
