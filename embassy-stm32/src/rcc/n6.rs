@@ -323,9 +323,9 @@ fn init_clocks(config: Config, input: &ClocksInput) -> ClocksOutput {
         SysClk::Hsi => unwrap!(input.hsi),
         SysClk::Msi => unwrap!(input.msi),
         SysClk::Hse => unwrap!(input.hse),
-        SysClk::Ic2 { source, divider } => match source {
-            Icsel::PLL1 => unwrap!(input.pll1) / (divider.to_bits() + 1),
-            Icsel::PLL2 => unwrap!(input.pll2) / (divider.to_bits() + 1),
+        SysClk::Ic2 { ic2, .. } => match ic2.source {
+            Icsel::PLL1 => unwrap!(input.pll1) / (ic2.divider.to_bits() + 1),
+            Icsel::PLL2 => unwrap!(input.pll2) / (ic2.divider.to_bits() + 1),
             Icsel::HSI_OSC_DIV4 => unwrap!(input.hsi) / 4,
             Icsel::HSI_OSC_DIV8 => unwrap!(input.hsi) / 8,
         },
