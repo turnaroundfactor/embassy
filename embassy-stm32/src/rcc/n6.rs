@@ -657,7 +657,7 @@ fn init_pll(pll_config: Option<Pll>, pll_index: usize, input: &PllInput) -> PllO
             // enable the pll
             RCC.csr().write(|w| w.set_pllons(pll_index, true));
             // wait until ready
-            while RCC.sr().read().pllrdy(pll_index) {}
+            while !RCC.sr().read().pllrdy(pll_index) {}
 
             PllOutput {
                 divm: Some(Hertz(m)),
