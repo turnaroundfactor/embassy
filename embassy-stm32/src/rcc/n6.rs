@@ -183,6 +183,10 @@ struct ClocksInput {
     hsi: Option<Hertz>,
     msi: Option<Hertz>,
     hse: Option<Hertz>,
+    pll1: Option<Hertz>,
+    pll2: Option<Hertz>,
+    pll3: Option<Hertz>,
+    pll4: Option<Hertz>,
 }
 
 fn init_clocks(config: Config, input: &ClocksInput) -> ClocksOutput {
@@ -307,14 +311,24 @@ fn init_clocks(config: Config, input: &ClocksInput) -> ClocksOutput {
         CpuClk::Hsi => unwrap!(input.hsi),
         CpuClk::Msi => unwrap!(input.msi),
         CpuClk::Hse => unwrap!(input.hse),
-        CpuClk::Ic1 { .. } => todo!(),
+        CpuClk::Ic1 { source, divider } => match source {
+            Icsel::PLL1 => unwrap!(input.pll1) / (divider.to_bits() + 1),
+            Icsel::PLL2 => unwrap!(input.pll2) / (divider.to_bits() + 1),
+            Icsel::HSI_OSC_DIV4 => unwrap!(input.hsi) / 4,
+            Icsel::HSI_OSC_DIV8 => unwrap!(input.hsi) / 8,
+        },
     };
 
     let sysclk = match config.sys {
         SysClk::Hsi => unwrap!(input.hsi),
         SysClk::Msi => unwrap!(input.msi),
         SysClk::Hse => unwrap!(input.hse),
-        SysClk::Ic2 { .. } => todo!(),
+        SysClk::Ic2 { source, divider } => match source {
+            Icsel::PLL1 => unwrap!(input.pll1) / (divider.to_bits() + 1),
+            Icsel::PLL2 => unwrap!(input.pll2) / (divider.to_bits() + 1),
+            Icsel::HSI_OSC_DIV4 => unwrap!(input.hsi) / 4,
+            Icsel::HSI_OSC_DIV8 => unwrap!(input.hsi) / 8,
+        },
     };
 
     let timpre: u32 = match RCC.cfgr2().read().timpre() {
@@ -1030,6 +1044,10 @@ pub(crate) unsafe fn init(config: Config) {
         hsi: osc.hsi,
         msi: osc.msi,
         hse: osc.hse,
+        pll1: osc.pll1,
+        pll2: osc.pll2,
+        pll3: osc.pll3,
+        pll4: osc.pll4,
     };
     let clocks = init_clocks(config, &clock_inputs);
 
