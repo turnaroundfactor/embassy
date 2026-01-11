@@ -1073,6 +1073,8 @@ pub(crate) unsafe fn init(config: Config) {
         per: None,
         rtc: None,
         i2s_ckin: None,
+        ic3: None,
+        ic4: None,
         ic8: None,
         ic9: None,
         ic10: None,
