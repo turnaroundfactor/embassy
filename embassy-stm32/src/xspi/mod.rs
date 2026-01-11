@@ -1159,7 +1159,6 @@ impl<'d, T: Instance> Xspi<'d, T, Async> {
         d6: Peri<'d, impl D6Pin<T>>,
         d7: Peri<'d, impl D7Pin<T>>,
         ncs: Peri<'d, impl NCSEither<T>>,
-        dqs0: Peri<'d, impl DQS0Pin<T>>,
         dma: Peri<'d, impl XDma<T>>,
         config: Config,
     ) -> Self {
