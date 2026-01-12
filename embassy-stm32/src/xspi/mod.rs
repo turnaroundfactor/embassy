@@ -295,8 +295,8 @@ impl<'d, T: Instance, M: PeriMode> Xspi<'d, T, M> {
     ) -> Self {
         // Enable the interface
         match T::SPI_IDX {
-            1 => crate::pac::RCC.ahb5ensr().modify(|w| w.set_xspi1ens(true));
-            2 => crate::pac::RCC.ahb5ensr().modify(|w| w.set_xspi2ens(true));
+            1 => crate::pac::RCC.ahb5ensr().modify(|w| w.set_xspi1ens(true)),
+            2 => crate::pac::RCC.ahb5ensr().modify(|w| w.set_xspi2ens(true)),
             _ => unreachable!(),
         };
 
