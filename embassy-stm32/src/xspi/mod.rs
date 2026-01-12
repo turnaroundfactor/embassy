@@ -295,15 +295,15 @@ impl<'d, T: Instance, M: PeriMode> Xspi<'d, T, M> {
     ) -> Self {
         // Enable the interface
         match T::SPI_IDX {
-            1 => crate::pac::PWR.csr2().modify(|r| r.set_en_xspim1(true)),
-            2 => crate::pac::PWR.csr2().modify(|r| r.set_en_xspim2(true)),
+            1 => crate::pac::RCC.ahb5ensr().modify(|w| w.set_xspi1ens(true));
+            2 => crate::pac::RCC.ahb5ensr().modify(|w| w.set_xspi2ens(true));
             _ => unreachable!(),
         };
 
         #[cfg(xspim_v1)]
         {
             // RCC for xspim should be enabled before writing register
-            crate::pac::RCC.ahb5enr().modify(|w| w.set_iomngren(true));
+            crate::pac::RCC.ahb5ensr().modify(|w| w.set_xspimens(true));
 
             // Disable XSPI peripheral first
             T::REGS.cr().modify(|w| {
@@ -1501,6 +1501,13 @@ impl SealedXspimInstance for peripherals::XSPI1 {
 impl SealedXspimInstance for peripherals::XSPI2 {
     const SPIM_REGS: Xspim = crate::pac::XSPIM;
     const SPI_IDX: u8 = 2;
+}
+
+// Some cubedb files are missing XSPI3, for example STM32H7R3Z8
+#[cfg(all(xspim_v1, peri_xspi3))]
+impl SealedXspimInstance for peripherals::XSPI3 {
+    const SPIM_REGS: Xspim = crate::pac::XSPIM;
+    const SPI_IDX: u8 = 3;
 }
 
 #[cfg(xspim_v1)]
