@@ -417,7 +417,7 @@ impl<'d, T: Instance, M: PeriMode> Xspi<'d, T, M> {
     }
 
     // Function to configure the peripheral for the requested command
-    fn configure_command(&mut self, command: &TransferConfig, data_len: Option<usize>) -> Result<(), XspiError> {
+    pub fn configure_command(&mut self, command: &TransferConfig, data_len: Option<usize>) -> Result<(), XspiError> {
         // Check that transaction doesn't use more than hardware initialized pins
         if <enums::XspiWidth as Into<u8>>::into(command.iwidth) > <enums::XspiWidth as Into<u8>>::into(self.width)
             || <enums::XspiWidth as Into<u8>>::into(command.adwidth) > <enums::XspiWidth as Into<u8>>::into(self.width)
