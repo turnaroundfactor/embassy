@@ -34,6 +34,8 @@ pub enum XspiWidth {
     QUAD,
     /// Eight lanes
     OCTO,
+    /// Sixteen lanes
+    HEXA,
 }
 
 impl Into<u8> for XspiWidth {
@@ -44,6 +46,7 @@ impl Into<u8> for XspiWidth {
             XspiWidth::DUAL => 0b10,
             XspiWidth::QUAD => 0b11,
             XspiWidth::OCTO => 0b100,
+            XspiWidth::HEXA => 0b101,
         }
     }
 }
