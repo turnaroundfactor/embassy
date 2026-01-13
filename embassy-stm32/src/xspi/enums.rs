@@ -83,6 +83,7 @@ pub enum MemoryType {
     MacronixRam,
     HyperBusMemory,
     HyperBusRegister,
+    Standard16Bit,
 }
 
 impl Into<u8> for MemoryType {
@@ -94,6 +95,7 @@ impl Into<u8> for MemoryType {
             MemoryType::MacronixRam => 0x03,
             MemoryType::HyperBusMemory => 0x04,
             MemoryType::HyperBusRegister => 0x04,
+            MemoryType::Standard16Bit => 0x06,
         }
     }
 }
