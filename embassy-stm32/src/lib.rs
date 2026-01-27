@@ -696,8 +696,8 @@ fn init_hw(config: Config) -> Peripherals {
             // );
     debug!("init - DB24");
     for _ in 0..2_000_000 {cortex_m::asm::nop()};
-            #[cfg(feature = "exti")]
-            exti::init(cs);
+            // #[cfg(feature = "exti")]
+            // exti::init(cs);
     debug!("init - DB25");
     for _ in 0..2_000_000 {cortex_m::asm::nop()};
 
