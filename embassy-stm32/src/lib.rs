@@ -685,15 +685,15 @@ fn init_hw(config: Config) -> Peripherals {
             gpio::init(cs);
     debug!("init - DB23");
     for _ in 0..2_000_000 {cortex_m::asm::nop()};
-            dma::init(
-                cs,
-                #[cfg(bdma)]
-                config.bdma_interrupt_priority,
-                #[cfg(dma)]
-                config.dma_interrupt_priority,
-                #[cfg(gpdma)]
-                config.gpdma_interrupt_priority,
-            );
+            // dma::init(
+            //     cs,
+            //     #[cfg(bdma)]
+            //     config.bdma_interrupt_priority,
+            //     #[cfg(dma)]
+            //     config.dma_interrupt_priority,
+            //     #[cfg(gpdma)]
+            //     config.gpdma_interrupt_priority,
+            // );
     debug!("init - DB24");
     for _ in 0..2_000_000 {cortex_m::asm::nop()};
             #[cfg(feature = "exti")]
