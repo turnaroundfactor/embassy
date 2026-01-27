@@ -193,7 +193,7 @@ fn init_clocks(config: Config, input: &ClocksInput) -> ClocksOutput {
     // handle increasing dividers
     debug!("configuring increasing pclk dividers");
     debug!("DB50");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
     RCC.cfgr2().modify(|w| {
         if config.apb1 > w.ppre1() {
             debug!("  - APB1");
@@ -217,14 +217,14 @@ fn init_clocks(config: Config, input: &ClocksInput) -> ClocksOutput {
         }
     });
     debug!("DB51");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
     // cpuclk
     debug!("configuring cpuclk");
     match config.cpu {
         CpuClk::Hse if !RCC.sr().read().hserdy() => panic!("HSE is not ready to be selected as CPU clock source"),
         CpuClk::Ic1 { source, divider } => {
     debug!("DB52");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
             if !pll_sources_ready(RCC.iccfgr(0).read().icsel().to_bits(), source.to_bits()) {
                 panic!("ICx clock switch requires both origin and destination clock source to be active")
             }
@@ -240,24 +240,24 @@ fn init_clocks(config: Config, input: &ClocksInput) -> ClocksOutput {
         _ => {}
     }
     debug!("DB53");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
     // set source
     let cpusw = Cpusw::from_bits(config.cpu.to_bits());
     RCC.cfgr().modify(|w| w.set_cpusw(cpusw));
     // wait for changes to take effect
     while RCC.cfgr().read().cpusws() != Cpusws::from_bits(config.cpu.to_bits()) {}
     debug!("DB54");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
 
     // sysclk
     debug!("configuring sysclk");
     debug!("DB55");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
     match config.sys {
         SysClk::Hse if !RCC.sr().read().hserdy() => panic!("HSE is not ready to be selected as CPU clock source"),
         SysClk::Ic2 { ic2, ic6, ic11 } => {
     debug!("DB56");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
             if !pll_sources_ready(RCC.iccfgr(1).read().icsel().to_bits(), ic2.source.to_bits()) {
                 panic!("IC2 clock switch requires both origin and destination clock source to be active")
             }
@@ -268,7 +268,7 @@ fn init_clocks(config: Config, input: &ClocksInput) -> ClocksOutput {
                 panic!("IC11 clock switch requires both origin and destination clock source to be active")
             }
     debug!("DB57");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
 
             RCC.iccfgr(1).write(|w| {
                 w.set_icsel(ic2.source);
@@ -288,14 +288,14 @@ fn init_clocks(config: Config, input: &ClocksInput) -> ClocksOutput {
                 w.set_ic11ens(true);
             });
     debug!("DB58");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
         }
         SysClk::Msi if !RCC.sr().read().msirdy() => panic!("MSI is not ready to be selected as CPU clock source"),
         SysClk::Hsi if !RCC.sr().read().hsirdy() => panic!("HSI is not ready to be selected as CPU clock source"),
         _ => {}
     }
     debug!("DB59");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
     // switch the system bus clock
     let syssw = Syssw::from_bits(config.sys.to_bits());
     RCC.cfgr().modify(|w| w.set_syssw(syssw));
@@ -305,7 +305,7 @@ fn init_clocks(config: Config, input: &ClocksInput) -> ClocksOutput {
     // decreasing dividers
     debug!("configuring decreasing pclk dividers");
     debug!("DB60");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
     RCC.cfgr2().modify(|w| {
         if config.ahb < w.hpre() {
             debug!("  - AHB");
@@ -329,7 +329,7 @@ fn init_clocks(config: Config, input: &ClocksInput) -> ClocksOutput {
         }
     });
     debug!("DB61");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
 
     let cpuclk = match config.cpu {
         CpuClk::Hsi => unwrap!(input.hsi),
@@ -343,7 +343,7 @@ fn init_clocks(config: Config, input: &ClocksInput) -> ClocksOutput {
         },
     };
     debug!("DB62");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
 
     let sysclk = match config.sys {
         SysClk::Hsi => unwrap!(input.hsi),
@@ -357,7 +357,7 @@ fn init_clocks(config: Config, input: &ClocksInput) -> ClocksOutput {
         },
     };
     debug!("DB63");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
 
     let timpre: u32 = match RCC.cfgr2().read().timpre() {
         Timpre::DIV1 => 1,
@@ -366,7 +366,7 @@ fn init_clocks(config: Config, input: &ClocksInput) -> ClocksOutput {
         Timpre::_RESERVED_3 => 8,
     };
     debug!("DB64");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
 
     let hpre = periph_prescaler_to_value(config.ahb.to_bits());
     let ppre1 = periph_prescaler_to_value(config.apb1.to_bits());
@@ -375,11 +375,11 @@ fn init_clocks(config: Config, input: &ClocksInput) -> ClocksOutput {
     let ppre5 = periph_prescaler_to_value(config.apb5.to_bits());
 
     debug!("DB65");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
     // enable all peripherals in sleep mode
     enable_low_power_peripherals();
     debug!("DB66");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
 
     // enable interrupts
     unsafe {
@@ -387,7 +387,7 @@ fn init_clocks(config: Config, input: &ClocksInput) -> ClocksOutput {
     }
 
     debug!("DB67");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
     ClocksOutput {
         sysclk,
         cpuclk,
@@ -402,21 +402,21 @@ fn init_clocks(config: Config, input: &ClocksInput) -> ClocksOutput {
 
 fn enable_low_power_peripherals() {
     debug!("DB70");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
     // AHB1-5
     RCC.ahb1lpenr().modify(|w| {
         w.set_adc12lpen(true);
         w.set_gpdma1lpen(true);
     });
     debug!("DB71");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
     RCC.ahb2lpenr().modify(|w| {
         w.set_adf1lpen(true);
         w.set_mdf1lpen(true);
         w.set_ramcfglpen(true);
     });
     debug!("DB72");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
     RCC.ahb3lpenr().modify(|w| {
         w.set_risaflpen(true);
         w.set_iaclpen(true);
@@ -428,7 +428,7 @@ fn enable_low_power_peripherals() {
         w.set_rnglpen(true);
     });
     debug!("DB73");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
     RCC.ahb4lpenr().modify(|w| {
         w.set_crclpen(true);
         w.set_pwrlpen(true);
@@ -446,7 +446,7 @@ fn enable_low_power_peripherals() {
         w.set_gpioalpen(true);
     });
     debug!("DB74");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
     RCC.ahb5lpenr().modify(|w| {
         w.set_npulpen(true);
         w.set_npucachelpen(true);
@@ -477,7 +477,7 @@ fn enable_low_power_peripherals() {
         w.set_hpdma1lpen(true);
     });
     debug!("DB75");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
 
     // APB1-5
     RCC.apb1llpenr().modify(|w| {
@@ -510,14 +510,14 @@ fn enable_low_power_peripherals() {
         w.set_tim2lpen(true);
     });
     debug!("DB76");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
     RCC.apb1hlpenr().modify(|w| {
         w.set_ucpd1lpen(true);
         w.set_fdcanlpen(true);
         w.set_mdioslpen(true);
     });
     debug!("DB77");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
     RCC.apb2lpenr().modify(|w| {
         w.set_sai2lpen(true);
         w.set_sai1lpen(true);
@@ -537,7 +537,7 @@ fn enable_low_power_peripherals() {
         w.set_tim1lpen(true);
     });
     debug!("DB78");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
     RCC.apb3lpenr().modify(|w| {
         w.set_dftlpen(true);
     });
@@ -560,7 +560,7 @@ fn enable_low_power_peripherals() {
         w.set_syscfglpen(true);
     });
     debug!("DB79");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
     RCC.apb5lpenr().modify(|w| {
         w.set_csilpen(true);
         w.set_venclpen(true);
@@ -574,7 +574,7 @@ fn enable_low_power_peripherals() {
         w.set_aclknlpen(true);
     });
     debug!("DB80");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
 
     RCC.memlpenr().modify(|w| {
         w.set_bootromlpen(true);
@@ -598,7 +598,7 @@ fn enable_low_power_peripherals() {
         w.set_dbglpen(true);
     });
     debug!("DB81");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
 }
 
 const fn periph_prescaler_to_value(bits: u8) -> u8 {
@@ -636,7 +636,7 @@ impl Default for Config {
 
 fn power_supply_config(supply_config: SupplyConfig) {
     debug!("DB1");
-    for _ in 0..2_000_000 {nop()}
+    for _ in 0..2_000_000 {cortex_m::asm::nop()}
     // power supply config
     PWR.cr1().modify(|w| {
         w.set_sden(match supply_config {
@@ -648,7 +648,7 @@ fn power_supply_config(supply_config: SupplyConfig) {
     // Validate supply configuration
     while !PWR.voscr().read().actvosrdy() {}
     debug!("DB2");
-    for _ in 0..2_000_000 {nop()}
+    for _ in 0..2_000_000 {cortex_m::asm::nop()}
 }
 
 struct PllInput {
@@ -806,7 +806,7 @@ struct OscOutput {
 
 fn init_osc(config: Config) -> OscOutput {
     debug!("DB10");
-    for _ in 0..2_000_000 {nop()}
+    for _ in 0..2_000_000 {cortex_m::asm::nop()}
     let (cpu_src, sys_src) = {
         let reg = RCC.cfgr().read();
         (reg.cpusws(), reg.syssws())
@@ -817,21 +817,21 @@ fn init_osc(config: Config) -> OscOutput {
     let pll4_src = RCC.pllcfgr1(3).read().pllsel();
     let rcc_sr = RCC.sr().read();
     debug!("DB11");
-    for _ in 0..2_000_000 {nop()}
+    for _ in 0..2_000_000 {cortex_m::asm::nop()}
 
     debug!("configuring HSE");
-    for _ in 0..2_000_000 {nop()}
+    for _ in 0..2_000_000 {cortex_m::asm::nop()}
 
     // hse configuration
     let hse = if let Some(hse) = config.hse {
         match hse.mode {
             HseMode::Oscillator => {
                 debug!("HSE in oscillator mode");
-    for _ in 0..2_000_000 {nop()}
+    for _ in 0..2_000_000 {cortex_m::asm::nop()}
             }
             HseMode::Bypass => {
                 debug!("HSE in bypass mode");
-    for _ in 0..2_000_000 {nop()}
+    for _ in 0..2_000_000 {cortex_m::asm::nop()}
                 RCC.hsecfgr().modify(|w| {
                     w.set_hsebyp(true);
                     w.set_hseext(Hseext::ANALOG);
@@ -839,7 +839,7 @@ fn init_osc(config: Config) -> OscOutput {
             }
             HseMode::BypassDigital => {
                 debug!("HSE in bypass digital mode");
-    for _ in 0..2_000_000 {nop()}
+    for _ in 0..2_000_000 {cortex_m::asm::nop()}
                 RCC.hsecfgr().modify(|w| {
                     w.set_hsebyp(true);
                     w.set_hseext(Hseext::DIGITAL);
@@ -847,13 +847,13 @@ fn init_osc(config: Config) -> OscOutput {
             }
         }
     debug!("DB12");
-    for _ in 0..2_000_000 {nop()}
+    for _ in 0..2_000_000 {cortex_m::asm::nop()}
         RCC.csr().write(|w| w.set_hseons(true));
 
         // wait until the hse is ready
         while !RCC.sr().read().hserdy() {}
     debug!("DB13");
-    for _ in 0..2_000_000 {nop()}
+    for _ in 0..2_000_000 {cortex_m::asm::nop()}
 
         Some(hse.freq)
     } else if cpu_src == Cpusws::HSE
@@ -864,13 +864,13 @@ fn init_osc(config: Config) -> OscOutput {
         || (pll4_src == Pllsel::HSE && rcc_sr.pllrdy(3))
     {
     debug!("DB14");
-    for _ in 0..2_000_000 {nop()}
+    for _ in 0..2_000_000 {cortex_m::asm::nop()}
         panic!(
             "When the HSE is used as cpu/system bus clock or clock source for any PLL, it is not allowed to be disabled"
         );
     } else {
     debug!("DB15");
-    for _ in 0..2_000_000 {nop()}
+    for _ in 0..2_000_000 {cortex_m::asm::nop()}
         debug!("HSE off");
 
         RCC.ccr().write(|w| w.set_hseonc(true));
@@ -882,7 +882,7 @@ fn init_osc(config: Config) -> OscOutput {
         // wait until the hse is disabled
         while RCC.sr().read().hserdy() {}
     debug!("DB16");
-    for _ in 0..2_000_000 {nop()}
+    for _ in 0..2_000_000 {cortex_m::asm::nop()}
 
         None
     };
@@ -890,22 +890,22 @@ fn init_osc(config: Config) -> OscOutput {
     // hsi configuration
     debug!("configuring HSI");
     debug!("DB17");
-    for _ in 0..2_000_000 {nop()}
+    for _ in 0..2_000_000 {cortex_m::asm::nop()}
     let hsi = if let Some(hsi) = config.hsi {
     debug!("DB18");
-    for _ in 0..2_000_000 {nop()}
+    for _ in 0..2_000_000 {cortex_m::asm::nop()}
         RCC.csr().write(|w| w.set_hsions(true));
         while !RCC.sr().read().hsirdy() {}
 
     debug!("DB19");
-    for _ in 0..2_000_000 {nop()}
+    for _ in 0..2_000_000 {cortex_m::asm::nop()}
         // set divider and calibration
         RCC.hsicfgr().modify(|w| {
             w.set_hsidiv(hsi.pre);
             w.set_hsitrim(hsi.trim);
-        })
+        });
     debug!("DB20");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
 
         Some(HSI_FREQ / hsi.pre)
     } else if cpu_src == Cpusws::HSI
@@ -916,38 +916,38 @@ fn init_osc(config: Config) -> OscOutput {
         || (pll4_src == Pllsel::HSI && rcc_sr.pllrdy(3))
     {
     debug!("DB21");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
         panic!(
             "When the HSI is used as cpu/system bus clock or clock source for any PLL, it is not allowed to be disabled"
         );
     } else {
         debug!("HSI off");
     debug!("DB22");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
 
         RCC.ccr().write(|w| w.set_hsionc(true));
         while RCC.sr().read().hsirdy() {}
 
     debug!("DB23");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
         None
     };
 
     // msi configuration
     debug!("configuring MSI");
     debug!("DB24");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
     let msi = if let Some(msi) = config.msi {
         
     debug!("DB25");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
         RCC.msicfgr().modify(|w| w.set_msifreqsel(msi.freq));
         RCC.csr().write(|w| w.set_msions(true));
         while !RCC.sr().read().msirdy() {}
         RCC.msicfgr().modify(|w| w.set_msitrim(msi.trim));
 
     debug!("DB26");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
         Some(match msi.freq {
             Msifreqsel::_4MHZ => Hertz::mhz(4),
             Msifreqsel::_16MHZ => Hertz::mhz(16),
@@ -960,60 +960,60 @@ fn init_osc(config: Config) -> OscOutput {
         || (pll4_src == Pllsel::MSI && rcc_sr.pllrdy(3))
     {
     debug!("DB27");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
         panic!(
             "When the MSI is used as cpu/system bus clock or clock source for any PLL, it is not allowed to be disabled"
         );
     } else {
     debug!("DB28");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
         RCC.ccr().write(|w| w.set_msionc(true));
         while RCC.sr().read().msirdy() {}
 
     debug!("DB29");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
         None
     };
 
     // lsi configuration
     debug!("configuring LSI");
     debug!("DB30");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
     let lsi = if config.lsi {
     debug!("DB31");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
         RCC.csr().write(|w| w.set_lsions(true));
         while !RCC.sr().read().lsirdy() {}
         Some(super::LSI_FREQ)
     } else {
     debug!("DB32");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
         RCC.ccr().write(|w| w.set_lsionc(true));
         while RCC.sr().read().lsirdy() {}
         None
     };
     debug!("DB33");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
 
     // lse configuration
     debug!("configuring LSE");
     debug!("DB34");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
     let lse = if config.lse {
     debug!("DB35");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
         RCC.csr().write(|w| w.set_lseons(true));
         while !RCC.sr().read().lserdy() {}
         Some(LSE_FREQ)
     } else {
     debug!("DB36");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
         RCC.ccr().write(|w| w.set_lseonc(true));
         while RCC.sr().read().lserdy() {}
         None
     };
     debug!("DB37");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
 
     let pll_input = PllInput {
         hse,
@@ -1027,25 +1027,25 @@ fn init_osc(config: Config) -> OscOutput {
     let mut pll_outputs: [PllOutput; 4] = [PllOutput::default(); 4];
 
     debug!("DB38");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
     let ic1_src = RCC.iccfgr(0).read().icsel();
     let ic2_src = RCC.iccfgr(1).read().icsel();
     let ic6_src = RCC.iccfgr(5).read().icsel();
     let ic11_src = RCC.iccfgr(10).read().icsel();
 
     debug!("DB39");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
     for (n, (&pll, out)) in pll_configs.iter().zip(pll_outputs.iter_mut()).enumerate() {
         debug!("configuring PLL{}", n + 1);
     debug!("DB40");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
         let pll_ready = RCC.sr().read().pllrdy(n);
 
     debug!("DB41");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
         if is_new_pll_config(pll, n) {
     debug!("DB42");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
             let this_pll = Icsel::from_bits(n as u8);
 
             if cpu_src == Cpusws::IC1 && ic1_src == this_pll {
@@ -1057,20 +1057,20 @@ fn init_osc(config: Config) -> OscOutput {
             }
 
     debug!("DB43");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
             *out = init_pll(pll, n, &pll_input);
         } else if pll.is_some() && !pll_ready {
     debug!("DB44");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
             RCC.csr().write(|w| w.set_pllons(n, true));
             while !RCC.sr().read().pllrdy(n) {}
     debug!("DB45");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
         }
     }
 
     debug!("DB46");
-    for _ in 0..2_000_000 {nop()};
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
     OscOutput {
         hsi,
         hse,
@@ -1130,14 +1130,14 @@ fn is_new_pll_config(pll: Option<Pll>, pll_index: usize) -> bool {
 
 pub(crate) unsafe fn init(config: Config) {
     debug!("enabling SYSCFG");
-    for _ in 0..2_000_000 {nop()}
+    for _ in 0..2_000_000 {cortex_m::asm::nop()}
     // system configuration setup
     RCC.apb4hensr().write(|w| w.set_syscfgens(true));
     // delay after RCC peripheral clock enabling
     RCC.apb4hensr().read();
 
     debug!("setting VTOR");
-    for _ in 0..2_000_000 {nop()}
+    for _ in 0..2_000_000 {cortex_m::asm::nop()}
 
     let vtor = unsafe {
         let p = cortex_m::Peripherals::steal();
@@ -1150,13 +1150,13 @@ pub(crate) unsafe fn init(config: Config) {
     SYSCFG.initsvtorcr().read();
 
     debug!("deactivating SYSCFG");
-    for _ in 0..2_000_000 {nop()}
+    for _ in 0..2_000_000 {cortex_m::asm::nop()}
 
     // deactivate SYSCFG
     RCC.apb4hensr().write(|w| w.set_syscfgens(false));
 
     debug!("enabling FPU");
-    for _ in 0..2_000_000 {nop()}
+    for _ in 0..2_000_000 {cortex_m::asm::nop()}
 
     // enable fpu
     unsafe {
@@ -1166,7 +1166,7 @@ pub(crate) unsafe fn init(config: Config) {
 
     // TODO: ugly workaround for DMA accesses until RIF is properly implemented
     debug!("deactivating RIF");
-    for _ in 0..2_000_000 {nop()}
+    for _ in 0..2_000_000 {cortex_m::asm::nop()}
     const RISAF3_BASE_NS: *mut u32 = stm32_metapac::RNG.wrapping_byte_offset(0x8000) as _; // AHB3PERIPH_BASE_NS + 0x8000UL
     const RISAF3_REG0_CFGR: *mut u32 = RISAF3_BASE_NS.wrapping_byte_offset(0x40);
     const RISAF3_REG0_ENDR: *mut u32 = RISAF3_BASE_NS.wrapping_byte_offset(0x48);
@@ -1184,19 +1184,19 @@ pub(crate) unsafe fn init(config: Config) {
     }
 
     debug!("setting power supply config");
-    for _ in 0..2_000_000 {nop()}
+    for _ in 0..2_000_000 {cortex_m::asm::nop()}
 
     debug!("DB3");
-    for _ in 0..2_000_000 {nop()}
+    for _ in 0..2_000_000 {cortex_m::asm::nop()}
     power_supply_config(config.supply_config);
     debug!("DB4");
-    for _ in 0..2_000_000 {nop()}
+    for _ in 0..2_000_000 {cortex_m::asm::nop()}
 
     debug!("DB5");
-    for _ in 0..2_000_000 {nop()}
+    for _ in 0..2_000_000 {cortex_m::asm::nop()}
     let osc = init_osc(config);
     debug!("DB6");
-    for _ in 0..2_000_000 {nop()}
+    for _ in 0..2_000_000 {cortex_m::asm::nop()}
     
     let clock_inputs = ClocksInput {
         hsi: osc.hsi,
@@ -1209,10 +1209,10 @@ pub(crate) unsafe fn init(config: Config) {
     };
     
     debug!("DB7");
-    for _ in 0..2_000_000 {nop()}
+    for _ in 0..2_000_000 {cortex_m::asm::nop()}
     let clocks = init_clocks(config, &clock_inputs);
     debug!("DB8");
-    for _ in 0..2_000_000 {nop()}
+    for _ in 0..2_000_000 {cortex_m::asm::nop()}
 
     // TODO: sysb, sysc, sysd must have the same clock source
 
