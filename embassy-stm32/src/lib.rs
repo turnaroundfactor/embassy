@@ -516,21 +516,39 @@ mod dual_core {
 pub use dual_core::*;
 
 fn init_hw(config: Config) -> Peripherals {
+    debug!("init - DB00");
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
     critical_section::with(|cs| {
         let p = Peripherals::take_with_cs(cs);
+    debug!("init - DB01");
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
 
         #[cfg(dbgmcu_n6)]
         {
+    debug!("init - DB02");
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
             crate::pac::RCC.miscensr().write(|w| w.set_dbgens(true));
+    debug!("init - DB03");
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
             crate::pac::RCC.miscenr().read(); // volatile read
+    debug!("init - DB04");
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
             crate::pac::DBGMCU
                 .cr()
                 .modify(|w| w.set_dbgclken(stm32_metapac::dbgmcu::vals::Dbgclken::B_0X1));
+    debug!("init - DB05");
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
             crate::pac::DBGMCU.cr().read();
+    debug!("init - DB06");
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
         }
 
+    debug!("init - DB07");
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
         #[cfg(dbgmcu)]
         crate::pac::DBGMCU.cr().modify(|cr| {
+    debug!("init - DB08");
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
             #[cfg(dbgmcu_h5)]
             {
                 cr.set_stop(config.enable_debug_during_sleep);
@@ -543,6 +561,8 @@ fn init_hw(config: Config) -> Peripherals {
                 cr.set_dbg_stop(config.enable_debug_during_sleep);
                 cr.set_dbg_standby(config.enable_debug_during_sleep);
             }
+    debug!("init - DB09");
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
             #[cfg(any(
                 dbgmcu_f1, dbgmcu_f2, dbgmcu_f3, dbgmcu_f4, dbgmcu_f7, dbgmcu_g4, dbgmcu_f7, dbgmcu_l0, dbgmcu_l1,
                 dbgmcu_l4, dbgmcu_wb, dbgmcu_wl, dbgmcu_n6
@@ -552,6 +572,8 @@ fn init_hw(config: Config) -> Peripherals {
                 cr.set_dbg_stop(config.enable_debug_during_sleep);
                 cr.set_dbg_standby(config.enable_debug_during_sleep);
             }
+    debug!("init - DB10");
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
             #[cfg(dbgmcu_h7)]
             {
                 cr.set_d1dbgcken(config.enable_debug_during_sleep);
@@ -561,13 +583,23 @@ fn init_hw(config: Config) -> Peripherals {
                 cr.set_dbgstop_d1(config.enable_debug_during_sleep);
             }
         });
+    debug!("init - DB11");
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
 
+    debug!("init - DB12");
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
         #[cfg(not(any(stm32f1, stm32wb, stm32wl, stm32h7rs)))]
         rcc::enable_and_reset_with_cs::<peripherals::SYSCFG>(cs);
+    debug!("init - DB13");
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
         #[cfg(not(any(stm32h5, stm32h7, stm32h7rs, stm32wb, stm32wl)))]
         rcc::enable_and_reset_with_cs::<peripherals::PWR>(cs);
+    debug!("init - DB14");
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
         #[cfg(all(flash, not(any(stm32f2, stm32f4, stm32f7, stm32l0, stm32h5, stm32h7, stm32h7rs))))]
         rcc::enable_and_reset_with_cs::<peripherals::FLASH>(cs);
+    debug!("init - DB15");
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
 
         // Enable the VDDIO2 power supply on chips that have it.
         // Note that this requires the PWR peripheral to be enabled first.
@@ -622,6 +654,8 @@ fn init_hw(config: Config) -> Peripherals {
             });
         }
 
+    debug!("init - DB20");
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
         unsafe {
             #[cfg(ucpd)]
             ucpd::init(
@@ -631,6 +665,8 @@ fn init_hw(config: Config) -> Peripherals {
                 #[cfg(peri_ucpd2)]
                 config.enable_ucpd2_dead_battery,
             );
+    debug!("init - DB21");
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
 
             #[cfg(feature = "_split-pins-enabled")]
             crate::pac::SYSCFG.pmcr().modify(|pmcr| {
@@ -644,7 +680,11 @@ fn init_hw(config: Config) -> Peripherals {
                 pmcr.set_pc3so(true);
             });
 
+    debug!("init - DB22");
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
             gpio::init(cs);
+    debug!("init - DB23");
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
             dma::init(
                 cs,
                 #[cfg(bdma)]
@@ -654,13 +694,21 @@ fn init_hw(config: Config) -> Peripherals {
                 #[cfg(gpdma)]
                 config.gpdma_interrupt_priority,
             );
+    debug!("init - DB24");
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
             #[cfg(feature = "exti")]
             exti::init(cs);
+    debug!("init - DB25");
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
 
             rcc::init_rcc(cs, config.rcc);
+    debug!("init - DB26");
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
 
             #[cfg(feature = "low-power")]
             rtc::init_rtc(cs, config.rtc, config.min_stop_pause);
+    debug!("init - DB27");
+    for _ in 0..2_000_000 {cortex_m::asm::nop()};
 
             #[cfg(all(stm32wb, feature = "low-power"))]
             hsem::init_hsem(cs);
