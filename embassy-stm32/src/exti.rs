@@ -269,12 +269,14 @@ impl<'a> ExtiInputFuture<'a> {
         critical_section::with(|_| {
             let pin = pin as usize;
             #[cfg(exti_n6)]
-            {
+            let port = {
                 const STM32_PORTI: PinNumber = 0x8;
                 const STM32_PORTN: PinNumber = 0xD;
-                if (port >= STM32_PORTN) {
-                    // Ports N and above (starting index 13) use value 8 and higher
-                    port = port - (STM32_PORTN - STM32_PORTI);
+                // Ports N and above (starting index 13) use value 8 and higher
+                if port >= STM32_PORTN {
+                    port - (STM32_PORTN - STM32_PORTI)
+                } else {
+                    port
                 }
             }
             exticr_regs().exticr(pin / 4).modify(|w| w.set_exti(pin % 4, port));
