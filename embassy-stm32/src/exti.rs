@@ -278,7 +278,7 @@ impl<'a> ExtiInputFuture<'a> {
                 } else {
                     port
                 }
-            }
+            };
             exticr_regs().exticr(pin / 4).modify(|w| w.set_exti(pin % 4, port));
             EXTI.rtsr(0).modify(|w| w.set_line(pin, rising));
             EXTI.ftsr(0).modify(|w| w.set_line(pin, falling));
