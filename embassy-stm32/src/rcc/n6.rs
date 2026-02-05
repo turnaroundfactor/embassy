@@ -359,6 +359,7 @@ fn init_clocks(config: Config, input: &ClocksInput) -> ClocksOutput {
 
     // decreasing dividers
     debug!("configuring decreasing pclk dividers");
+    debug!("6");
     RCC.cfgr2().modify(|w| {
         if config.ahb < w.hpre() {
             debug!("  - AHB");
@@ -381,6 +382,7 @@ fn init_clocks(config: Config, input: &ClocksInput) -> ClocksOutput {
             w.set_ppre5(config.apb5);
         }
     });
+    debug!("7");
 
     let cpuclk = match config.cpu {
         CpuClk::Hsi => unwrap!(input.hsi),
@@ -397,6 +399,7 @@ fn init_clocks(config: Config, input: &ClocksInput) -> ClocksOutput {
             Hertz(src_freq.0 / div)
         }
     };
+    debug!("8");
 
     let sysclk = match config.sys {
         SysClk::Hsi => unwrap!(input.hsi),
@@ -413,6 +416,7 @@ fn init_clocks(config: Config, input: &ClocksInput) -> ClocksOutput {
             Hertz(src_freq.0 / div)
         }
     };
+    debug!("9");
 
     let timpre: u32 = match RCC.cfgr2().read().timpre() {
         Timpre::DIV1 => 1,
@@ -420,22 +424,26 @@ fn init_clocks(config: Config, input: &ClocksInput) -> ClocksOutput {
         Timpre::DIV4 => 4,
         Timpre::_RESERVED_3 => 8,
     };
+    debug!("10");
 
     let hpre = periph_prescaler_to_value(config.ahb.to_bits());
     let ppre1 = periph_prescaler_to_value(config.apb1.to_bits());
     let ppre2 = periph_prescaler_to_value(config.apb2.to_bits());
     let ppre4 = periph_prescaler_to_value(config.apb4.to_bits());
     let ppre5 = periph_prescaler_to_value(config.apb5.to_bits());
+    debug!("11");
 
     // enable all peripherals in sleep mode
     enable_low_power_peripherals();
+    debug!("12");
 
     // enable interrupts
     unsafe {
         core::arch::asm!("cpsie i");
     }
+    debug!("13");
 
-    ClocksOutput {
+    let x = ClocksOutput {
         sysclk,
         cpuclk,
         pclk_tim: sysclk / timpre,
@@ -444,7 +452,12 @@ fn init_clocks(config: Config, input: &ClocksInput) -> ClocksOutput {
         apb2: sysclk / hpre / ppre2,
         apb4: sysclk / hpre / ppre4,
         apb5: sysclk / hpre / ppre5,
-    }
+    };
+    
+    debug!("14");
+    debug!("15: {:?}, {:?}, {:?}, {:?}, {:?}", x.sysclk, x.cpuclk, x.pclk_tim, x.ahb, x.apb1);
+    debug!("16");
+    x
 }
 
 fn enable_low_power_peripherals() {
@@ -1252,7 +1265,9 @@ pub(crate) unsafe fn init(config: Config) {
         pll3: osc.pll3,
         pll4: osc.pll4,
     };
+    debug!("1");
     let clocks = init_clocks(config, &clock_inputs);
+    debug!("2");
 
     // Calculate IC3 clock frequency (XSPI1 kernel clock)
     let ic3_freq = config
@@ -1271,6 +1286,7 @@ pub(crate) unsafe fn init(config: Config) {
             })
         })
         .flatten();
+    debug!("3");
 
     // Calculate IC4 clock frequency (XSPI2 kernel clock)
     let ic4_freq = config
@@ -1289,6 +1305,7 @@ pub(crate) unsafe fn init(config: Config) {
             })
         })
         .flatten();
+    debug!("4");
 
     // TODO: sysb, sysc, sysd must have the same clock source
 
@@ -1323,4 +1340,5 @@ pub(crate) unsafe fn init(config: Config) {
         ic17: None,
         ic20: None,
     );
+    debug!("5");
 }
