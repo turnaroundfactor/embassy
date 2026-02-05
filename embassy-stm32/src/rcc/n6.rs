@@ -321,41 +321,41 @@ fn init_clocks(config: Config, input: &ClocksInput) -> ClocksOutput {
     // wait for changes to be applied
     while RCC.cfgr().read().syssws() != Syssws::from_bits(config.sys.to_bits()) {}
 
-    // IC3 configuration (XSPI1 kernel clock)
-    debug!("configuring IC3");
-    if let Some(ic3) = config.ic3 {
-        if !pll_sources_ready(RCC.iccfgr(2).read().icsel().to_bits(), ic3.source.to_bits()) {
-            panic!("IC3 clock switch requires both origin and destination clock source to be active")
-        }
+    // // IC3 configuration (XSPI1 kernel clock)
+    // debug!("configuring IC3");
+    // if let Some(ic3) = config.ic3 {
+    //     if !pll_sources_ready(RCC.iccfgr(2).read().icsel().to_bits(), ic3.source.to_bits()) {
+    //         panic!("IC3 clock switch requires both origin and destination clock source to be active")
+    //     }
 
-        RCC.iccfgr(2).write(|w| {
-            w.set_icsel(ic3.source);
-            w.set_icint(ic3.divider);
-        });
-        RCC.divensr().modify(|w| w.set_ic3ens(true));
-    }
+    //     RCC.iccfgr(2).write(|w| {
+    //         w.set_icsel(ic3.source);
+    //         w.set_icint(ic3.divider);
+    //     });
+    //     RCC.divensr().modify(|w| w.set_ic3ens(true));
+    // }
 
-    // IC4 configuration (XSPI2 kernel clock)
-    debug!("configuring IC4");
-    if let Some(ic4) = config.ic4 {
-        if !pll_sources_ready(RCC.iccfgr(3).read().icsel().to_bits(), ic4.source.to_bits()) {
-            panic!("IC4 clock switch requires both origin and destination clock source to be active")
-        }
+    // // IC4 configuration (XSPI2 kernel clock)
+    // debug!("configuring IC4");
+    // if let Some(ic4) = config.ic4 {
+    //     if !pll_sources_ready(RCC.iccfgr(3).read().icsel().to_bits(), ic4.source.to_bits()) {
+    //         panic!("IC4 clock switch requires both origin and destination clock source to be active")
+    //     }
 
-        RCC.iccfgr(3).write(|w| {
-            w.set_icsel(ic4.source);
-            w.set_icint(ic4.divider);
-        });
-        RCC.divensr().modify(|w| w.set_ic4ens(true));
-    }
+    //     RCC.iccfgr(3).write(|w| {
+    //         w.set_icsel(ic4.source);
+    //         w.set_icint(ic4.divider);
+    //     });
+    //     RCC.divensr().modify(|w| w.set_ic4ens(true));
+    // }
 
     // XSPI clock source configuration
-    debug!("configuring XSPI clock sources");
-    RCC.ccipr6().modify(|w| {
-        w.set_xspi1sel(config.xspi1_clk_src);
-        w.set_xspi2sel(config.xspi2_clk_src);
-        w.set_xspi3sel(config.xspi3_clk_src);
-    });
+    // debug!("configuring XSPI clock sources");
+    // RCC.ccipr6().modify(|w| {
+    //     w.set_xspi1sel(config.xspi1_clk_src);
+    //     w.set_xspi2sel(config.xspi2_clk_src);
+    //     w.set_xspi3sel(config.xspi3_clk_src);
+    // });
 
     // decreasing dividers
     debug!("configuring decreasing pclk dividers");
