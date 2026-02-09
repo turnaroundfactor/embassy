@@ -321,33 +321,33 @@ fn init_clocks(config: Config, input: &ClocksInput) -> ClocksOutput {
     // wait for changes to be applied
     while RCC.cfgr().read().syssws() != Syssws::from_bits(config.sys.to_bits()) {}
 
-    // // IC3 configuration (XSPI1 kernel clock)
-    // debug!("configuring IC3");
-    // if let Some(ic3) = config.ic3 {
-    //     if !pll_sources_ready(RCC.iccfgr(2).read().icsel().to_bits(), ic3.source.to_bits()) {
-    //         panic!("IC3 clock switch requires both origin and destination clock source to be active")
-    //     }
+    // IC3 configuration (XSPI1 kernel clock)
+    debug!("configuring IC3");
+    if let Some(ic3) = config.ic3 {
+        if !pll_sources_ready(RCC.iccfgr(2).read().icsel().to_bits(), ic3.source.to_bits()) {
+            panic!("IC3 clock switch requires both origin and destination clock source to be active")
+        }
 
-    //     RCC.iccfgr(2).write(|w| {
-    //         w.set_icsel(ic3.source);
-    //         w.set_icint(ic3.divider);
-    //     });
-    //     RCC.divensr().modify(|w| w.set_ic3ens(true));
-    // }
+        RCC.iccfgr(2).write(|w| {
+            w.set_icsel(ic3.source);
+            w.set_icint(ic3.divider);
+        });
+        RCC.divensr().modify(|w| w.set_ic3ens(true));
+    }
 
-    // // IC4 configuration (XSPI2 kernel clock)
-    // debug!("configuring IC4");
-    // if let Some(ic4) = config.ic4 {
-    //     if !pll_sources_ready(RCC.iccfgr(3).read().icsel().to_bits(), ic4.source.to_bits()) {
-    //         panic!("IC4 clock switch requires both origin and destination clock source to be active")
-    //     }
+    // IC4 configuration (XSPI2 kernel clock)
+    debug!("configuring IC4");
+    if let Some(ic4) = config.ic4 {
+        if !pll_sources_ready(RCC.iccfgr(3).read().icsel().to_bits(), ic4.source.to_bits()) {
+            panic!("IC4 clock switch requires both origin and destination clock source to be active")
+        }
 
-    //     RCC.iccfgr(3).write(|w| {
-    //         w.set_icsel(ic4.source);
-    //         w.set_icint(ic4.divider);
-    //     });
-    //     RCC.divensr().modify(|w| w.set_ic4ens(true));
-    // }
+        RCC.iccfgr(3).write(|w| {
+            w.set_icsel(ic4.source);
+            w.set_icint(ic4.divider);
+        });
+        RCC.divensr().modify(|w| w.set_ic4ens(true));
+    }
 
     // XSPI clock source configuration
     // debug!("configuring XSPI clock sources");
@@ -1195,65 +1195,65 @@ pub(crate) unsafe fn init(config: Config) {
 
     // VddIO power domain configuration per STM32N6 errata ES0620
     // This must be done early in boot - set SV bits and wait for RDY
-    // debug!("configuring VddIO power domains");
-    // {
-    //     // Enable supply valid for all VddIO domains (like ST's SystemInit)
-    //     // PWR is always accessible on N6, no need to enable clock
+    debug!("configuring VddIO power domains");
+    {
+        // Enable supply valid for all VddIO domains (like ST's SystemInit)
+        // PWR is always accessible on N6, no need to enable clock
 
-    //     // SVMCR1: VddIO4
-    //     PWR.svmcr1().modify(|w| {
-    //         w.set_vddio4sv(Vddio4sv::B_0X1);
-    //     });
-    //     // SVMCR2: VddIO5
-    //     PWR.svmcr2().modify(|w| {
-    //         w.set_vddio5sv(Vddio5sv::B_0X1);
-    //     });
-    //     // SVMCR3: VddIO2 and VddIO3 (for XSPI1 and XSPI2)
-    //     PWR.svmcr3().modify(|w| {
-    //         w.set_vddio2sv(Vddio2sv::B_0X1);
-    //         w.set_vddio2vmen(true); // Enable voltage monitoring
-    //         w.set_vddio3sv(Vddio3sv::B_0X1);
-    //         w.set_vddio3vmen(true); // Enable voltage monitoring
-    //         // Set voltage range based on config
-    //         if config.vddio2_1v8 {
-    //             w.set_vddio2vrsel(Vddio2vrsel::B_0X1); // 1.8V mode
-    //         }
-    //         if config.vddio3_1v8 {
-    //             w.set_vddio3vrsel(Vddio3vrsel::B_0X1); // 1.8V mode
-    //         }
-    //     });
+        // SVMCR1: VddIO4
+        PWR.svmcr1().modify(|w| {
+            w.set_vddio4sv(Vddio4sv::B_0X1);
+        });
+        // SVMCR2: VddIO5
+        PWR.svmcr2().modify(|w| {
+            w.set_vddio5sv(Vddio5sv::B_0X1);
+        });
+        // SVMCR3: VddIO2 and VddIO3 (for XSPI1 and XSPI2)
+        PWR.svmcr3().modify(|w| {
+            w.set_vddio2sv(Vddio2sv::B_0X1);
+            w.set_vddio2vmen(true); // Enable voltage monitoring
+            w.set_vddio3sv(Vddio3sv::B_0X1);
+            w.set_vddio3vmen(true); // Enable voltage monitoring
+            // Set voltage range based on config
+            if config.vddio2_1v8 {
+                w.set_vddio2vrsel(Vddio2vrsel::B_0X1); // 1.8V mode
+            }
+            if config.vddio3_1v8 {
+                w.set_vddio3vrsel(Vddio3vrsel::B_0X1); // 1.8V mode
+            }
+        });
 
-    //     // Wait for VddIO domains to be ready
-    //     while PWR.svmcr3().read().vddio2rdy() != Vddio2rdy::B_0X1 {}
-    //     while PWR.svmcr3().read().vddio3rdy() != Vddio3rdy::B_0X1 {}
+        // Wait for VddIO domains to be ready
+        while PWR.svmcr3().read().vddio2rdy() != Vddio2rdy::B_0X1 {}
+        while PWR.svmcr3().read().vddio3rdy() != Vddio3rdy::B_0X1 {}
 
-    //     // Debug VddIO status after configuration
-    //     let svmcr3 = PWR.svmcr3().read();
-    //     debug!("VddIO2 ready: {}", svmcr3.vddio2rdy() == Vddio2rdy::B_0X1);
-    //     debug!("VddIO3 ready: {}", svmcr3.vddio3rdy() == Vddio3rdy::B_0X1);
-    //     debug!("SVMCR3 raw = 0x{:08x}", svmcr3.0);
+        // Debug VddIO status after configuration
+        let svmcr3 = PWR.svmcr3().read();
+        debug!("VddIO2 ready: {}", svmcr3.vddio2rdy() == Vddio2rdy::B_0X1);
+        debug!("VddIO3 ready: {}", svmcr3.vddio3rdy() == Vddio3rdy::B_0X1);
+        debug!("SVMCR3 raw = 0x{:08x}", svmcr3.0);
 
-    //     // Configure compensation cells per errata ES0620
-    //     // SYSCFG is already enabled earlier in init
+        // Configure compensation cells per errata ES0620
+        // SYSCFG is already enabled earlier in init
 
-    //     // Set compensation cell values (0x287 = ST's recommended value)
-    //     // ransrc=7 (bits 0-3), rapsrc=8 (bits 4-7), en=1 (bit 8)
-    //     SYSCFG.vddio2cccr().write(|w| {
-    //         w.set_ransrc(0x7);
-    //         w.set_rapsrc(0x8);
-    //         w.set_en(Vddio2cccrEn::B_0X1);
-    //     });
-    //     SYSCFG.vddio3cccr().write(|w| {
-    //         w.set_ransrc(0x7);
-    //         w.set_rapsrc(0x8);
-    //         w.set_en(Vddio3cccrEn::B_0X1);
-    //     });
-    //     SYSCFG.vddio4cccr().write(|w| {
-    //         w.set_ransrc(0x7);
-    //         w.set_rapsrc(0x8);
-    //         w.set_en(Vddio4cccrEn::B_0X1);
-    //     });
-    // }
+        // Set compensation cell values (0x287 = ST's recommended value)
+        // ransrc=7 (bits 0-3), rapsrc=8 (bits 4-7), en=1 (bit 8)
+        SYSCFG.vddio2cccr().write(|w| {
+            w.set_ransrc(0x7);
+            w.set_rapsrc(0x8);
+            w.set_en(Vddio2cccrEn::B_0X1);
+        });
+        SYSCFG.vddio3cccr().write(|w| {
+            w.set_ransrc(0x7);
+            w.set_rapsrc(0x8);
+            w.set_en(Vddio3cccrEn::B_0X1);
+        });
+        SYSCFG.vddio4cccr().write(|w| {
+            w.set_ransrc(0x7);
+            w.set_rapsrc(0x8);
+            w.set_en(Vddio4cccrEn::B_0X1);
+        });
+    }
 
     let osc = init_osc(config);
     let clock_inputs = ClocksInput {
