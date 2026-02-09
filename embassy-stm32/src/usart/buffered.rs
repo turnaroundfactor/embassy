@@ -16,7 +16,7 @@ use super::{
     clear_interrupt_flags, configure, half_duplex_set_rx_tx_before_write, rdr, reconfigure, send_break, set_baudrate,
     sr, tdr,
 };
-use crate::gpio::{AfType, AnyPin, Pull, SealedPin as _};
+use crate::gpio::{AfType, Flex, Pull};
 use crate::interrupt::{self, InterruptExt};
 use crate::time::Hertz;
 
@@ -170,9 +170,9 @@ pub struct BufferedUartTx<'d> {
     info: &'static Info,
     state: &'static State,
     kernel_clock: Hertz,
-    tx: Option<Peri<'d, AnyPin>>,
-    cts: Option<Peri<'d, AnyPin>>,
-    de: Option<Peri<'d, AnyPin>>,
+    tx: Option<Flex<'d>>,
+    cts: Option<Flex<'d>>,
+    de: Option<Flex<'d>>,
     is_borrowed: bool,
 }
 
@@ -183,8 +183,8 @@ pub struct BufferedUartRx<'d> {
     info: &'static Info,
     state: &'static State,
     kernel_clock: Hertz,
-    rx: Option<Peri<'d, AnyPin>>,
-    rts: Option<Peri<'d, AnyPin>>,
+    rx: Option<Flex<'d>>,
+    rts: Option<Flex<'d>>,
     is_borrowed: bool,
 }
 
@@ -415,11 +415,11 @@ impl<'d> BufferedUart<'d> {
 
     fn new_inner<T: Instance>(
         _peri: Peri<'d, T>,
-        rx: Option<Peri<'d, AnyPin>>,
-        tx: Option<Peri<'d, AnyPin>>,
-        rts: Option<Peri<'d, AnyPin>>,
-        cts: Option<Peri<'d, AnyPin>>,
-        de: Option<Peri<'d, AnyPin>>,
+        rx: Option<Flex<'d>>,
+        tx: Option<Flex<'d>>,
+        rts: Option<Flex<'d>>,
+        cts: Option<Flex<'d>>,
+        de: Option<Flex<'d>>,
         tx_buffer: &'d mut [u8],
         rx_buffer: &'d mut [u8],
         config: Config,
@@ -522,17 +522,17 @@ impl<'d> BufferedUart<'d> {
                 info: self.tx.info,
                 state: self.tx.state,
                 kernel_clock: self.tx.kernel_clock,
-                tx: self.tx.tx.as_mut().map(Peri::reborrow),
-                cts: self.tx.cts.as_mut().map(Peri::reborrow),
-                de: self.tx.de.as_mut().map(Peri::reborrow),
+                tx: self.tx.tx.as_mut().map(Flex::reborrow),
+                cts: self.tx.cts.as_mut().map(Flex::reborrow),
+                de: self.tx.de.as_mut().map(Flex::reborrow),
                 is_borrowed: true,
             },
             BufferedUartRx {
                 info: self.rx.info,
                 state: self.rx.state,
                 kernel_clock: self.rx.kernel_clock,
-                rx: self.rx.rx.as_mut().map(Peri::reborrow),
-                rts: self.rx.rts.as_mut().map(Peri::reborrow),
+                rx: self.rx.rx.as_mut().map(Flex::reborrow),
+                rts: self.rx.rts.as_mut().map(Flex::reborrow),
                 is_borrowed: true,
             },
         )
@@ -688,22 +688,33 @@ impl<'d> BufferedUartTx<'d> {
 
             let empty = state.tx_buf.is_empty();
 
-            let mut tx_writer = unsafe { state.tx_buf.writer() };
-            let data = tx_writer.push_slice();
-            if data.is_empty() {
-                state.tx_waker.register(cx.waker());
+            if state.tx_buf.len() < buf.len() {
+                return Poll::Ready(Err(Error::BufferTooLong));
+            }
+
+            if state.tx_buf.len() - state.tx_buf.available() < buf.len() {
                 return Poll::Pending;
             }
 
-            let n = data.len().min(buf.len());
-            data[..n].copy_from_slice(&buf[..n]);
-            tx_writer.push_done(n);
+            let mut written: usize = 0;
+            let mut tx_writer = unsafe { state.tx_buf.writer() };
+            while written != buf.len() {
+                let data = tx_writer.push_slice();
+                if data.is_empty() {
+                    state.tx_waker.register(cx.waker());
+                    return Poll::Pending;
+                }
+                let n = data.len().min(buf.len() - written);
+                data[..n].copy_from_slice(&buf[written..written + n]);
+                written = written + n;
+                tx_writer.push_done(n);
+            }
 
             if empty {
                 self.info.interrupt.pend();
             }
 
-            Poll::Ready(Ok(n))
+            Poll::Ready(Ok(written))
         })
         .await
     }
@@ -729,19 +740,23 @@ impl<'d> BufferedUartTx<'d> {
 
             let empty = state.tx_buf.is_empty();
 
+            let mut written: usize = 0;
             let mut tx_writer = unsafe { state.tx_buf.writer() };
-            let data = tx_writer.push_slice();
-            if !data.is_empty() {
-                let n = data.len().min(buf.len());
-                data[..n].copy_from_slice(&buf[..n]);
-                tx_writer.push_done(n);
-
-                if empty {
-                    self.info.interrupt.pend();
+            while written != buf.len() {
+                let data = tx_writer.push_slice();
+                if !data.is_empty() {
+                    let n = data.len().min(buf.len() - written);
+                    data[..n].copy_from_slice(&buf[written..written + n]);
+                    written = written + n;
+                    tx_writer.push_done(n);
                 }
-
-                return Ok(n);
             }
+
+            if empty {
+                self.info.interrupt.pend();
+            }
+
+            return Ok(written);
         }
     }
 
@@ -791,8 +806,6 @@ impl<'d> Drop for BufferedUartRx<'d> {
                 }
             }
 
-            self.rx.as_ref().map(|x| x.set_as_disconnected());
-            self.rts.as_ref().map(|x| x.set_as_disconnected());
             drop_tx_rx(self.info, state);
         }
     }
@@ -811,10 +824,6 @@ impl<'d> Drop for BufferedUartTx<'d> {
                     self.info.interrupt.disable();
                 }
             }
-
-            self.tx.as_ref().map(|x| x.set_as_disconnected());
-            self.cts.as_ref().map(|x| x.set_as_disconnected());
-            self.de.as_ref().map(|x| x.set_as_disconnected());
             drop_tx_rx(self.info, state);
         }
     }

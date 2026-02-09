@@ -5,9 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+<!-- next-header -->
 ## Unreleased - ReleaseDate
-- Add `receive_waveform` method in `InputCapture`, allowing asynchronous input capture with DMA.
+- fix: stm32/i2s: defer I2SE enable from constructor to `start()` for proper slave frame synchronization
+- fix: stm32/i2s: Use correct PLLI2S clock source for STM32F2 and STM32F7 instead of APB clock
+- fix: stm32/spi-i2s: Add dedicated I2sSdPin trait for I2S data pins to unlock previously unavailable I2S pin configurations
+- feat: stm32/i2s: add `new_rxonly_nomck` and `new_full_duplex_nomck` constructors for use without master clock (e.g. slave mode)
+- fix: stm32/i2c v2: Fix async slave by using DMA completion instead of TC flag for buffer-full detection
+- change: stm32/i2c v2: slave `respond_to_write` and `respond_to_read` now return actual bytes transferred instead of buffer size (breaking change, matching v1 behavior)
+- fix: stm32/i2c v1: `write_read` was losing last write byte before RESTART due to not waiting for BTF
+- fix: stm32/i2c v1: slave: async `respond_to_write` and `respond_to_read` now return actual bytes transferred instead of buffer size
+- fix: don't put USB pins into alternate mode on chips where USB is an additional function
+- feat: add i2s to STM32G4 except G414
+- fix: stm32/rcc: allow linker to optimize out expensive PLL init functions in binaries where the PLL is not used (e.g. most bootloaders)
 
+## 0.5.0 - 2026-01-04
+- Add `receive_waveform` method in `InputCapture`, allowing asynchronous input capture with DMA.
 - fix: stm32: GPDMA driver reset ignored during channel configuration
 - fix: stm32: SPI driver SSOE and SSM manegment, add `nss_output_disable` to SPI Config
 - change: stm32: use typelevel timer type to allow dma for 32 bit timers
@@ -90,13 +103,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix: build script ensures EXTI2_TSC is listed as the IRQ of EXTI2 even if the PAC doesn't
 - feat: stm32/lcd: added implementation
 - change: add error messages to can timing calculations ([#4961](https://github.com/embassy-rs/embassy/pull/4961))
-- feat: stm32/spi bidirectional mode 
+- feat: stm32/spi bidirectional mode
 - fix: stm32/i2c v2: add stop flag on stop received
 - stm32: Add blocking_listen for blocking I2C driver
 - fix: stm32l47*/stm32l48* adc analog pin setup
 - fix: keep stm32/sai: make NODIV independent of MCKDIV
 - fix: Source system clock from MSIS before (de)configuring PLLs on STM32U5
 - feat: adc: allow DMA reads to loop through enabled channels
+- chore: update to embedded-io 0.7
 
 ## 0.4.0 - 2025-08-26
 
