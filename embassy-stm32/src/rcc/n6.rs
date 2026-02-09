@@ -350,12 +350,12 @@ fn init_clocks(config: Config, input: &ClocksInput) -> ClocksOutput {
     }
 
     // XSPI clock source configuration
-    // debug!("configuring XSPI clock sources");
-    // RCC.ccipr6().modify(|w| {
-    //     w.set_xspi1sel(config.xspi1_clk_src);
-    //     w.set_xspi2sel(config.xspi2_clk_src);
-    //     w.set_xspi3sel(config.xspi3_clk_src);
-    // });
+    debug!("configuring XSPI clock sources");
+    RCC.ccipr6().modify(|w| {
+        w.set_xspi1sel(config.xspi1_clk_src);
+        w.set_xspi2sel(config.xspi2_clk_src);
+        w.set_xspi3sel(config.xspi3_clk_src);
+    });
 
     // decreasing dividers
     debug!("configuring decreasing pclk dividers");
