@@ -484,6 +484,9 @@ embassy_hal_internal::peripherals! {
     WDT0,
     #[cfg(feature = "_s")]
     WDT1,
+
+    // VPR
+    VPR
 }
 
 impl_pin!(P0_00, 0, 0);
@@ -648,8 +651,8 @@ impl_spim!(
     SPIM00,
     SERIAL00,
     match pac::OSCILLATORS_S.pll().currentfreq().read().currentfreq() {
-        pac::oscillators::vals::Currentfreq::CK128M => 128_000_000,
-        pac::oscillators::vals::Currentfreq::CK64M => 64_000_000,
+        pac::oscillators::vals::Currentfreq::Ck128m => 128_000_000,
+        pac::oscillators::vals::Currentfreq::Ck64m => 64_000_000,
         _ => unreachable!(),
     }
 );
@@ -659,8 +662,8 @@ impl_spim!(
     SPIM00,
     SERIAL00,
     match pac::OSCILLATORS_NS.pll().currentfreq().read().currentfreq() {
-        pac::oscillators::vals::Currentfreq::CK128M => 128_000_000,
-        pac::oscillators::vals::Currentfreq::CK64M => 64_000_000,
+        pac::oscillators::vals::Currentfreq::Ck128m => 128_000_000,
+        pac::oscillators::vals::Currentfreq::Ck64m => 64_000_000,
         _ => unreachable!(),
     }
 );
@@ -692,6 +695,9 @@ impl_saadc_input!(P1_14, 1, 14);
 
 #[cfg(feature = "_s")]
 impl_cracen!(CRACEN, CRACEN, CRACEN);
+
+#[cfg(feature = "_s")]
+impl_vpr!(VPR, VPR00, VPR00);
 
 embassy_hal_internal::interrupt_mod!(
     SWI00,

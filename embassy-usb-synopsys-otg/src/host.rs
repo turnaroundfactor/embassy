@@ -6,7 +6,9 @@ use core::marker::PhantomData;
 use core::task::Poll;
 
 use embassy_sync::waitqueue::AtomicWaker;
-use embassy_usb_driver::host::{ChannelError, DeviceEvent, HostError, SetupPacket, UsbChannel, UsbHostDriver, channel};
+use embassy_usb_driver::host::{
+    DeviceEvent, HostError, PipeError, SplitInfo, UsbHostAllocator, UsbHostController, UsbPipe, pipe,
+};
 use embassy_usb_driver::{EndpointInfo, EndpointType, Speed};
 use portable_atomic::{AtomicBool, AtomicU8, Ordering};
 
@@ -449,10 +451,80 @@ impl<'d, const CH_COUNT: usize> OtgHost<'d, CH_COUNT> {
     }
 }
 
-impl<'d, const CH_COUNT: usize> UsbHostDriver for OtgHost<'d, CH_COUNT> {
-    type Channel<T: channel::Type, D: channel::Direction> = Channel<T, D, CH_COUNT>;
+/// Pipe allocator handle for [`OtgHost`].
+///
+/// Obtained from [`UsbHostController::allocator`]. Holds only `Copy` handles
+/// to the controller's `'d`-borrowed state, so it can be freely copied and
+/// retained by class drivers independently of the controller's `&mut` borrow.
+pub struct OtgHostAllocator<'d, const CH_COUNT: usize> {
+    regs: Otg,
+    state: &'d HostState<CH_COUNT>,
+    channel_count: usize,
+}
 
-    async fn wait_for_device_event(&self) -> DeviceEvent {
+impl<'d, const CH_COUNT: usize> Clone for OtgHostAllocator<'d, CH_COUNT> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<'d, const CH_COUNT: usize> Copy for OtgHostAllocator<'d, CH_COUNT> {}
+
+impl<'d, const CH_COUNT: usize> UsbHostAllocator<'d> for OtgHostAllocator<'d, CH_COUNT> {
+    type Pipe<T: pipe::Type, D: pipe::Direction> = Channel<'d, T, D, CH_COUNT>;
+
+    fn alloc_pipe<T: pipe::Type, D: pipe::Direction>(
+        &self,
+        addr: u8,
+        endpoint: &EndpointInfo,
+        _split: Option<SplitInfo>,
+    ) -> Result<Self::Pipe<T, D>, HostError> {
+        let ep_number = endpoint.addr.index() as u8;
+        let max_packet_size = endpoint.max_packet_size;
+
+        // Read device speed from port_speed atomic (stored by ISR)
+        let speed_code = self.state.port_speed.load(Ordering::Acquire);
+        let is_low_speed = speed_code == 1;
+
+        // Find a free channel using atomic CAS
+        for i in 0..self.channel_count.min(CH_COUNT) {
+            if self.state.channels[i]
+                .allocated
+                .compare_exchange(false, true, Ordering::AcqRel, Ordering::Relaxed)
+                .is_ok()
+            {
+                self.state.channels[i].result.store(CH_RESULT_NONE, Ordering::Release);
+
+                return Ok(Channel {
+                    regs: self.regs,
+                    state: self.state,
+                    index: i,
+                    device_address: addr,
+                    ep_number,
+                    max_packet_size,
+                    is_low_speed,
+                    data_toggle: false,
+                    phantom: PhantomData,
+                });
+            }
+        }
+
+        Err(HostError::OutOfPipes)
+    }
+}
+
+impl<'d, const CH_COUNT: usize> UsbHostController<'d> for OtgHost<'d, CH_COUNT> {
+    type Allocator = OtgHostAllocator<'d, CH_COUNT>;
+
+    fn allocator(&self) -> Self::Allocator {
+        OtgHostAllocator {
+            regs: self.instance.regs,
+            state: self.instance.state,
+            channel_count: self.instance.channel_count,
+        }
+    }
+
+    async fn wait_for_device_event(&mut self) -> DeviceEvent {
         // Lazily initialize the host hardware on first call.
         if !self.instance.state.inited.load(Ordering::Acquire) {
             self.configure_as_host().await;
@@ -467,10 +539,13 @@ impl<'d, const CH_COUNT: usize> UsbHostDriver for OtgHost<'d, CH_COUNT> {
                 state.port_waker.register(cx.waker());
 
                 let ev = state.port_event.load(Ordering::Acquire);
-                if ev & (PORT_EVENT_DISCONNECTED | PORT_EVENT_OVERCURRENT) != 0 {
-                    state
-                        .port_event
-                        .fetch_and(!(PORT_EVENT_DISCONNECTED | PORT_EVENT_OVERCURRENT), Ordering::AcqRel);
+                if ev & PORT_EVENT_OVERCURRENT != 0 {
+                    state.port_event.fetch_and(!PORT_EVENT_OVERCURRENT, Ordering::AcqRel);
+                    return Poll::Ready(PORT_EVENT_OVERCURRENT);
+                }
+
+                if ev & PORT_EVENT_DISCONNECTED != 0 {
+                    state.port_event.fetch_and(!PORT_EVENT_DISCONNECTED, Ordering::AcqRel);
                     // Wake all channels to signal disconnection
                     for ch in &state.channels {
                         if ch.allocated.load(Ordering::Relaxed) {
@@ -478,6 +553,7 @@ impl<'d, const CH_COUNT: usize> UsbHostDriver for OtgHost<'d, CH_COUNT> {
                             ch.waker.wake();
                         }
                     }
+
                     return Poll::Ready(PORT_EVENT_DISCONNECTED);
                 }
                 if ev & PORT_EVENT_CONNECTED != 0 {
@@ -501,10 +577,12 @@ impl<'d, const CH_COUNT: usize> UsbHostDriver for OtgHost<'d, CH_COUNT> {
                 state.port_waker.register(cx.waker());
 
                 let ev = state.port_event.load(Ordering::Acquire);
-                if ev & (PORT_EVENT_DISCONNECTED | PORT_EVENT_OVERCURRENT) != 0 {
-                    state
-                        .port_event
-                        .fetch_and(!(PORT_EVENT_DISCONNECTED | PORT_EVENT_OVERCURRENT), Ordering::AcqRel);
+                if ev & PORT_EVENT_OVERCURRENT != 0 {
+                    state.port_event.fetch_and(!PORT_EVENT_OVERCURRENT, Ordering::AcqRel);
+                    return Poll::Ready(PORT_EVENT_OVERCURRENT);
+                }
+                if ev & PORT_EVENT_DISCONNECTED != 0 {
+                    state.port_event.fetch_and(!PORT_EVENT_DISCONNECTED, Ordering::AcqRel);
                     for ch in &state.channels {
                         if ch.allocated.load(Ordering::Relaxed) {
                             ch.result.store(CH_RESULT_HALTED, Ordering::Release);
@@ -549,6 +627,10 @@ impl<'d, const CH_COUNT: usize> UsbHostDriver for OtgHost<'d, CH_COUNT> {
 
                     return DeviceEvent::Connected(speed);
                 }
+                PORT_EVENT_OVERCURRENT => {
+                    return DeviceEvent::Overcurrent;
+                }
+
                 _ => {
                     // Disconnected while waiting for enable; loop and wait again.
                     return DeviceEvent::Disconnected;
@@ -557,7 +639,7 @@ impl<'d, const CH_COUNT: usize> UsbHostDriver for OtgHost<'d, CH_COUNT> {
         }
     }
 
-    async fn bus_reset(&self) {
+    async fn bus_reset(&mut self) {
         let r = self.instance.regs;
         let ch_count = self.instance.channel_count.min(CH_COUNT);
 
@@ -617,75 +699,27 @@ impl<'d, const CH_COUNT: usize> UsbHostDriver for OtgHost<'d, CH_COUNT> {
         // Wait for the device to recover after reset de-assertion.
         embassy_time::Timer::after_millis(20).await;
     }
-
-    fn alloc_channel<T: channel::Type, D: channel::Direction>(
-        &self,
-        addr: u8,
-        endpoint: &EndpointInfo,
-        _pre: bool,
-    ) -> Result<Self::Channel<T, D>, HostError> {
-        let ep_number = endpoint.addr.index() as u8;
-        let max_packet_size = endpoint.max_packet_size;
-        let ep_type = endpoint.ep_type;
-
-        // Read device speed from port_speed atomic (stored by ISR)
-        let speed_code = self.instance.state.port_speed.load(Ordering::Acquire);
-        let is_low_speed = speed_code == 1;
-
-        // Find a free channel using atomic CAS
-        for i in 0..self.instance.channel_count.min(CH_COUNT) {
-            if self.instance.state.channels[i]
-                .allocated
-                .compare_exchange(false, true, Ordering::AcqRel, Ordering::Relaxed)
-                .is_ok()
-            {
-                self.instance.state.channels[i]
-                    .result
-                    .store(CH_RESULT_NONE, Ordering::Release);
-
-                return Ok(Channel {
-                    regs: self.instance.regs,
-                    // SAFETY: state is behind a &'d reference which outlives all channels.
-                    // Channel release is atomic via Drop.
-                    state: self.instance.state as *const _ as *const HostState<CH_COUNT>,
-                    index: i,
-                    device_address: addr,
-                    ep_number,
-                    ep_type,
-                    max_packet_size,
-                    is_low_speed,
-                    data_toggle: false,
-                    phantom: PhantomData,
-                });
-            }
-        }
-
-        Err(HostError::OutOfChannels)
-    }
 }
 
 /// A USB host channel for performing transfers.
 ///
 /// The channel is automatically released when dropped.
-pub struct Channel<T: channel::Type, D: channel::Direction, const CH_COUNT: usize> {
+pub struct Channel<'d, T: pipe::Type, D: pipe::Direction, const CH_COUNT: usize> {
     regs: Otg,
-    /// Raw pointer to avoid lifetime dependency on OtgHost.
-    /// SAFETY: The HostState is always in a static or lives for 'd which outlives all channels.
-    state: *const HostState<CH_COUNT>,
+    state: &'d HostState<CH_COUNT>,
     index: usize,
     device_address: u8,
     ep_number: u8,
-    ep_type: EndpointType,
     max_packet_size: u16,
     is_low_speed: bool,
     data_toggle: bool,
     phantom: PhantomData<(T, D)>,
 }
 
-// SAFETY: Channel access to HostState is through atomics only.
-unsafe impl<T: channel::Type, D: channel::Direction, const CH_COUNT: usize> Send for Channel<T, D, CH_COUNT> {}
+// SAFETY: Channel only accesses its own state in the shared HostState.
+unsafe impl<T: pipe::Type, D: pipe::Direction, const CH_COUNT: usize> Send for Channel<'_, T, D, CH_COUNT> {}
 
-impl<T: channel::Type, D: channel::Direction, const CH_COUNT: usize> Drop for Channel<T, D, CH_COUNT> {
+impl<T: pipe::Type, D: pipe::Direction, const CH_COUNT: usize> Drop for Channel<'_, T, D, CH_COUNT> {
     fn drop(&mut self) {
         let r = self.regs;
         let ch = self.index;
@@ -713,17 +747,12 @@ impl<T: channel::Type, D: channel::Direction, const CH_COUNT: usize> Drop for Ch
         // Clear any pending channel interrupts.
         r.hcint(ch).write_value(crate::otg_v1::regs::Hcint(0xFFFF_FFFF));
 
-        let state = unsafe { &*self.state };
-        state.channels[ch].result.store(CH_RESULT_NONE, Ordering::Release);
-        state.channels[ch].allocated.store(false, Ordering::Release);
+        self.state.channels[ch].result.store(CH_RESULT_NONE, Ordering::Release);
+        self.state.channels[ch].allocated.store(false, Ordering::Release);
     }
 }
 
-impl<T: channel::Type, D: channel::Direction, const CH_COUNT: usize> Channel<T, D, CH_COUNT> {
-    fn state(&self) -> &HostState<CH_COUNT> {
-        unsafe { &*self.state }
-    }
-
+impl<T: pipe::Type, D: pipe::Direction, const CH_COUNT: usize> Channel<'_, T, D, CH_COUNT> {
     fn configure_channel(&self, dir_in: bool, ep_type: EndpointType, pktcnt: u16, xfrsiz: u32, dpid: u8) {
         let r = self.regs;
         let ch = self.index;
@@ -787,7 +816,7 @@ impl<T: channel::Type, D: channel::Direction, const CH_COUNT: usize> Channel<T, 
             w.set_dterrm(true);
         });
 
-        // Enable this channel in HAINTMSK (critical section guards the RMW against concurrent alloc_channel)
+        // Enable this channel in HAINTMSK (critical section guards the RMW against concurrent alloc_pipe)
         critical_section::with(|_| {
             r.haintmsk().modify(|w| {
                 w.set_haintm(w.haintm() | (1 << ch));
@@ -798,9 +827,7 @@ impl<T: channel::Type, D: channel::Direction, const CH_COUNT: usize> Channel<T, 
         r.hcint(ch).write_value(crate::otg_v1::regs::Hcint(0xFFFF_FFFF));
 
         // Clear result
-        self.state().channels[ch]
-            .result
-            .store(CH_RESULT_NONE, Ordering::Release);
+        self.state.channels[ch].result.store(CH_RESULT_NONE, Ordering::Release);
     }
 
     fn enable_channel(&self) {
@@ -840,7 +867,7 @@ impl<T: channel::Type, D: channel::Direction, const CH_COUNT: usize> Channel<T, 
     }
 
     fn setup_rx_buffer(&self, buf: &mut [u8]) {
-        let ch_state = &self.state().channels[self.index];
+        let ch_state = &self.state.channels[self.index];
         unsafe {
             *ch_state.rx_buffer.get() = buf.as_mut_ptr();
             *ch_state.rx_count.get() = 0;
@@ -849,7 +876,7 @@ impl<T: channel::Type, D: channel::Direction, const CH_COUNT: usize> Channel<T, 
     }
 
     fn clear_rx_buffer(&self) {
-        let ch_state = &self.state().channels[self.index];
+        let ch_state = &self.state.channels[self.index];
         unsafe {
             *ch_state.rx_buffer.get() = core::ptr::null_mut();
             *ch_state.rx_count.get() = 0;
@@ -858,17 +885,16 @@ impl<T: channel::Type, D: channel::Direction, const CH_COUNT: usize> Channel<T, 
     }
 
     fn rx_count(&self) -> usize {
-        unsafe { *self.state().channels[self.index].rx_count.get() }
+        unsafe { *self.state.channels[self.index].rx_count.get() }
     }
 
     async fn wait_for_result(&self) -> u8 {
         poll_fn(|cx| {
-            let ch_state = &self.state().channels[self.index];
+            let ch_state = &self.state.channels[self.index];
             ch_state.waker.register(cx.waker());
 
-            let result = ch_state.result.load(Ordering::Acquire);
+            let result = ch_state.result.swap(CH_RESULT_NONE, Ordering::AcqRel);
             if result != CH_RESULT_NONE {
-                ch_state.result.store(CH_RESULT_NONE, Ordering::Release);
                 Poll::Ready(result)
             } else {
                 Poll::Pending
@@ -877,22 +903,22 @@ impl<T: channel::Type, D: channel::Direction, const CH_COUNT: usize> Channel<T, 
         .await
     }
 
-    fn result_to_error(result: u8) -> Result<(), ChannelError> {
+    fn result_to_error(result: u8) -> Result<(), PipeError> {
         match result {
             CH_RESULT_COMPLETE => Ok(()),
-            CH_RESULT_STALL => Err(ChannelError::Stall),
+            CH_RESULT_STALL => Err(PipeError::Stall),
             CH_RESULT_NAK => Ok(()), // NAK is not an error, just retry
-            CH_RESULT_TXERR => Err(ChannelError::BadResponse),
-            CH_RESULT_BBERR => Err(ChannelError::BadResponse),
-            CH_RESULT_FRMOR => Err(ChannelError::BadResponse),
-            CH_RESULT_DTERR => Err(ChannelError::BadResponse),
-            CH_RESULT_HALTED => Err(ChannelError::Disconnected),
-            _ => Err(ChannelError::BadResponse),
+            CH_RESULT_TXERR => Err(PipeError::BadResponse),
+            CH_RESULT_BBERR => Err(PipeError::Babble),
+            CH_RESULT_FRMOR => Err(PipeError::BadResponse),
+            CH_RESULT_DTERR => Err(PipeError::DataToggleError),
+            CH_RESULT_HALTED => Err(PipeError::Disconnected),
+            _ => Err(PipeError::BadResponse),
         }
     }
 
     /// Execute an OUT transfer on this channel, retrying on NAK up to [`NAK_RETRY_LIMIT`] times.
-    async fn do_out_transfer(&mut self, ep_type: EndpointType, data: &[u8], dpid: u8) -> Result<(), ChannelError> {
+    async fn do_out_transfer(&mut self, ep_type: EndpointType, data: &[u8], dpid: u8) -> Result<(), PipeError> {
         let pktcnt = if data.is_empty() {
             1
         } else {
@@ -909,7 +935,7 @@ impl<T: channel::Type, D: channel::Direction, const CH_COUNT: usize> Channel<T, 
             if result == CH_RESULT_NAK {
                 nak_retries += 1;
                 if nak_retries >= NAK_RETRY_LIMIT {
-                    return Err(ChannelError::Timeout);
+                    return Err(PipeError::Timeout);
                 }
                 yield_now().await;
                 continue;
@@ -919,7 +945,7 @@ impl<T: channel::Type, D: channel::Direction, const CH_COUNT: usize> Channel<T, 
     }
 
     /// Execute an IN transfer on this channel, retrying on NAK up to [`NAK_RETRY_LIMIT`] times.
-    async fn do_in_transfer(&mut self, ep_type: EndpointType, buf: &mut [u8], dpid: u8) -> Result<usize, ChannelError> {
+    async fn do_in_transfer(&mut self, ep_type: EndpointType, buf: &mut [u8], dpid: u8) -> Result<usize, PipeError> {
         // For interrupt/isochronous endpoints, only request one packet per transfer.
         // The device sends at most one packet per (micro)frame.
         let is_periodic = matches!(ep_type, EndpointType::Interrupt | EndpointType::Isochronous);
@@ -965,7 +991,7 @@ impl<T: channel::Type, D: channel::Direction, const CH_COUNT: usize> Channel<T, 
                     // and polling should continue indefinitely.
                     nak_retries += 1;
                     if nak_retries >= NAK_RETRY_LIMIT {
-                        return Err(ChannelError::Timeout);
+                        return Err(PipeError::Timeout);
                     }
                 }
                 yield_now().await;
@@ -978,7 +1004,7 @@ impl<T: channel::Type, D: channel::Direction, const CH_COUNT: usize> Channel<T, 
     }
 
     /// Perform a control IN transfer (SETUP -> DATA IN -> STATUS OUT).
-    async fn do_control_in(&mut self, setup: &[u8], buf: &mut [u8]) -> Result<usize, ChannelError> {
+    async fn do_control_in(&mut self, setup: &[u8], buf: &mut [u8]) -> Result<usize, PipeError> {
         // SETUP phase
         self.do_out_transfer(EndpointType::Control, setup, vals::Dpid::SETUP.to_bits())
             .await?;
@@ -1012,7 +1038,7 @@ impl<T: channel::Type, D: channel::Direction, const CH_COUNT: usize> Channel<T, 
     }
 
     /// Perform a control OUT transfer (SETUP -> DATA OUT -> STATUS IN).
-    async fn do_control_out(&mut self, setup: &[u8], data: &[u8]) -> Result<(), ChannelError> {
+    async fn do_control_out(&mut self, setup: &[u8], data: &[u8]) -> Result<(), PipeError> {
         // SETUP phase
         self.do_out_transfer(EndpointType::Control, setup, vals::Dpid::SETUP.to_bits())
             .await?;
@@ -1054,26 +1080,26 @@ impl<T: channel::Type, D: channel::Direction, const CH_COUNT: usize> Channel<T, 
     }
 }
 
-impl<T: channel::Type, D: channel::Direction, const CH_COUNT: usize> UsbChannel<T, D> for Channel<T, D, CH_COUNT> {
-    async fn control_in(&mut self, setup: &SetupPacket, buf: &mut [u8]) -> Result<usize, ChannelError>
+impl<T: pipe::Type, D: pipe::Direction, const CH_COUNT: usize> UsbPipe<T, D> for Channel<'_, T, D, CH_COUNT> {
+    async fn control_in(&mut self, setup: &[u8; 8], buf: &mut [u8]) -> Result<usize, PipeError>
     where
-        T: channel::IsControl,
-        D: channel::IsIn,
+        T: pipe::IsControl,
+        D: pipe::IsIn,
     {
-        self.do_control_in(setup.as_bytes(), buf).await
+        self.do_control_in(setup, buf).await
     }
 
-    async fn control_out(&mut self, setup: &SetupPacket, buf: &[u8]) -> Result<(), ChannelError>
+    async fn control_out(&mut self, setup: &[u8; 8], buf: &[u8]) -> Result<(), PipeError>
     where
-        T: channel::IsControl,
-        D: channel::IsOut,
+        T: pipe::IsControl,
+        D: pipe::IsOut,
     {
-        self.do_control_out(setup.as_bytes(), buf).await
+        self.do_control_out(setup, buf).await
     }
 
-    async fn request_in(&mut self, buf: &mut [u8]) -> Result<usize, ChannelError>
+    async fn request_in(&mut self, buf: &mut [u8]) -> Result<usize, PipeError>
     where
-        D: channel::IsIn,
+        D: pipe::IsIn,
     {
         let dpid = if self.data_toggle {
             vals::Dpid::DATA1
@@ -1086,9 +1112,9 @@ impl<T: channel::Type, D: channel::Direction, const CH_COUNT: usize> UsbChannel<
         Ok(n)
     }
 
-    async fn request_out(&mut self, buf: &[u8], _ensure_transaction_end: bool) -> Result<(), ChannelError>
+    async fn request_out(&mut self, buf: &[u8], _ensure_transaction_end: bool) -> Result<(), PipeError>
     where
-        D: channel::IsOut,
+        D: pipe::IsOut,
     {
         let dpid = if self.data_toggle {
             vals::Dpid::DATA1
@@ -1101,16 +1127,12 @@ impl<T: channel::Type, D: channel::Direction, const CH_COUNT: usize> UsbChannel<
         Ok(())
     }
 
-    fn retarget_channel(&mut self, addr: u8, endpoint: &EndpointInfo, _pre: bool) -> Result<(), HostError> {
-        self.device_address = addr;
-        self.ep_number = endpoint.addr.index() as u8;
-        self.max_packet_size = endpoint.max_packet_size;
-        self.ep_type = endpoint.ep_type;
-        Ok(())
-    }
-
     fn set_timeout(&mut self, _timeout: embassy_usb_driver::host::TimeoutConfig) {
         // Hardware timeouts; no-op
+    }
+
+    fn reset_data_toggle(&mut self) {
+        self.data_toggle = false;
     }
 }
 

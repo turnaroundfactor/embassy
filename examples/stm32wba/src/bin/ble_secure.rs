@@ -33,14 +33,14 @@ use embassy_stm32::rcc::{
 };
 use embassy_stm32::rng::{self, Rng};
 use embassy_stm32::time::Hertz;
-use embassy_stm32::{Config, bind_interrupts, interrupt};
+use embassy_stm32::{Config, bind_interrupts};
 use embassy_stm32_wpan::gap::{AdvData, AdvParams, AdvType, GapEvent};
 use embassy_stm32_wpan::gatt::{CharProperties, GattEventMask, GattServer, SecurityPermissions, ServiceType, Uuid};
 use embassy_stm32_wpan::hci::event::EventParams;
 use embassy_stm32_wpan::security::{
     PairingFailureReason, PairingStatus, SecureConnectionsSupport, SecurityManager, SecurityParams,
 };
-use embassy_stm32_wpan::{Ble, ble_runner, run_radio_high_isr, run_radio_sw_low_isr};
+use embassy_stm32_wpan::{Ble, HighInterruptHandler, LowInterruptHandler, ble_runner};
 use embassy_sync::blocking_mutex::Mutex;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use static_cell::StaticCell;
@@ -50,24 +50,14 @@ bind_interrupts!(struct Irqs {
     RNG => rng::InterruptHandler<embassy_stm32::peripherals::RNG>;
     AES => aes::InterruptHandler<AesPeriph>;
     PKA => pka::InterruptHandler<PkaPeriph>;
+    RADIO => HighInterruptHandler;
+    HASH => LowInterruptHandler;
 });
 
 /// Custom service UUID
 const SECURE_SERVICE_UUID: u16 = 0xABCD;
 /// Characteristic that requires encryption
 const SECURE_CHAR_UUID: u16 = 0xABCE;
-
-// RADIO interrupt handler - required for BLE stack operation
-#[interrupt]
-unsafe fn RADIO() {
-    unsafe { run_radio_high_isr() };
-}
-
-// HASH interrupt handler - used as software low-priority interrupt for BLE
-#[interrupt]
-unsafe fn HASH() {
-    unsafe { run_radio_sw_low_isr() };
-}
 
 /// BLE runner task - drives the BLE stack sequencer
 #[embassy_executor::task]
@@ -81,12 +71,12 @@ async fn main(spawner: Spawner) {
 
     // Enable HSE (32 MHz external crystal) - REQUIRED for BLE radio
     config.rcc.hse = Some(Hse {
-        prescaler: HsePrescaler::DIV1,
+        prescaler: HsePrescaler::Div1,
     });
 
     // Enable LSE (32.768 kHz external crystal) - REQUIRED for BLE radio sleep timer
     config.rcc.ls = LsConfig {
-        rtc: RtcClockSource::LSE,
+        rtc: RtcClockSource::Lse,
         lsi: false,
         lse: Some(LseConfig {
             frequency: Hertz(32_768),
@@ -97,23 +87,23 @@ async fn main(spawner: Spawner) {
 
     // Configure PLL1 (required on WBA)
     config.rcc.pll1 = Some(embassy_stm32::rcc::Pll {
-        source: PllSource::HSI,
-        prediv: PllPreDiv::DIV1,
-        mul: PllMul::MUL30,
-        divr: Some(PllDiv::DIV5),
+        source: PllSource::Hsi,
+        prediv: PllPreDiv::Div1,
+        mul: PllMul::Mul30,
+        divr: Some(PllDiv::Div5),
         divq: None,
-        divp: Some(PllDiv::DIV30),
+        divp: Some(PllDiv::Div30),
         frac: Some(0),
     });
 
-    config.rcc.ahb_pre = AHBPrescaler::DIV1;
-    config.rcc.apb1_pre = APBPrescaler::DIV1;
-    config.rcc.apb2_pre = APBPrescaler::DIV1;
-    config.rcc.apb7_pre = APBPrescaler::DIV1;
-    config.rcc.ahb5_pre = AHB5Prescaler::DIV4;
-    config.rcc.voltage_scale = VoltageScale::RANGE1;
-    config.rcc.sys = Sysclk::PLL1_R;
-    config.rcc.mux.rngsel = mux::Rngsel::HSI;
+    config.rcc.ahb_pre = AHBPrescaler::Div1;
+    config.rcc.apb1_pre = APBPrescaler::Div1;
+    config.rcc.apb2_pre = APBPrescaler::Div1;
+    config.rcc.apb7_pre = APBPrescaler::Div1;
+    config.rcc.ahb5_pre = AHB5Prescaler::Div4;
+    config.rcc.voltage_scale = VoltageScale::Range1;
+    config.rcc.sys = Sysclk::Pll1R;
+    config.rcc.mux.rngsel = mux::Rngsel::Hsi;
 
     let p = embassy_stm32::init(config);
 
@@ -121,7 +111,7 @@ async fn main(spawner: Spawner) {
     {
         use embassy_stm32::pac::RCC;
         use embassy_stm32::pac::rcc::vals::Radiostsel;
-        RCC.bdcr().modify(|w| w.set_radiostsel(Radiostsel::LSE));
+        RCC.bdcr().modify(|w| w.set_radiostsel(Radiostsel::Lse));
     }
 
     info!("Embassy STM32WBA BLE Secure Peripheral Example");
@@ -139,17 +129,15 @@ async fn main(spawner: Spawner) {
 
     info!("Hardware peripherals initialized (RNG, AES, PKA)");
 
-    // Initialize BLE stack
-    let mut ble = Ble::new(rng, aes, pka);
-    ble.init().expect("BLE initialization failed");
-    info!("BLE stack initialized");
-
     // Spawn the BLE runner task (required for proper BLE operation)
     spawner.spawn(ble_runner_task().expect("Failed to spawn BLE runner"));
-    embassy_futures::yield_now().await;
+
+    // Initialize BLE stack
+    let (mut ble, runtime) = Ble::new(rng, aes, pka, Irqs).await.expect("BLE initialization failed");
+    info!("BLE stack initialized");
 
     // ===== Configure Security =====
-    let mut security = SecurityManager::new();
+    let mut security = SecurityManager::new(runtime);
 
     // Configure security parameters:
     // - Enable bonding (store keys)
@@ -172,8 +160,7 @@ async fn main(spawner: Spawner) {
         .expect("Failed to enable address resolution");
 
     // Initialize GATT server
-    let mut gatt = GattServer::new();
-    gatt.init().expect("GATT initialization failed");
+    let mut gatt = GattServer::new(runtime);
 
     // Create a service with a secure characteristic
     let service_uuid = Uuid::from_u16(SECURE_SERVICE_UUID);
@@ -223,9 +210,8 @@ async fn main(spawner: Spawner) {
 
     // Start advertising
     {
-        let mut advertiser = ble.advertiser();
-        advertiser
-            .start(adv_params.clone(), create_adv_data(), None)
+        ble.start_advertising(adv_params.clone(), create_adv_data(), None)
+            .await
             .expect("Failed to start advertising");
     }
 
@@ -263,8 +249,9 @@ async fn main(spawner: Spawner) {
                     info!("  Handle: 0x{:04X}, Reason: 0x{:02X}", handle.0, reason);
 
                     // Restart advertising
-                    let mut advertiser = ble.advertiser();
-                    let _ = advertiser.start(adv_params.clone(), create_adv_data(), None);
+                    ble.start_advertising(adv_params.clone(), create_adv_data(), None)
+                        .await
+                        .expect("Failed to start advertising");
                     info!("Advertising restarted");
                 }
 
