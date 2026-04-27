@@ -140,7 +140,7 @@ pub mod rtc;
 pub mod saes;
 #[cfg(sai)]
 pub mod sai;
-#[cfg(sdmmc)]
+#[cfg(any(sdmmc_v1, sdmmc_v2, sdmmc_v3))]
 pub mod sdmmc;
 #[cfg(spdifrx)]
 pub mod spdifrx;
