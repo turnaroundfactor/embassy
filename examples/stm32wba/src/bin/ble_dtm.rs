@@ -28,9 +28,10 @@ use embassy_stm32::peripherals::RNG;
 use embassy_stm32::rng::{self, Rng};
 use embassy_stm32::time::Hertz;
 use embassy_stm32::{Config, bind_interrupts, exti, interrupt};
-use embassy_stm32_wpan::hci::command::{le_receiver_test, le_test_end, le_transmitter_test};
-use embassy_stm32_wpan::hci::types::DtmPacketPayload;
-use embassy_stm32_wpan::{Ble, HighInterruptHandler, LowInterruptHandler};
+use embassy_stm32_wpan::bluetooth::ble::Ble;
+use embassy_stm32_wpan::bluetooth::hci::command::{le_receiver_test, le_test_end, le_transmitter_test};
+use embassy_stm32_wpan::bluetooth::hci::types::DtmPacketPayload;
+use embassy_stm32_wpan::{Controller, HighInterruptHandler, LowInterruptHandler, new_controller_state};
 use embassy_sync::blocking_mutex::Mutex;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_time::Timer;
@@ -121,8 +122,12 @@ async fn main(_spawner: Spawner) {
 
     info!("Hardware peripherals initialized (RNG)");
 
-    // Initialize BLE-DTM stack
-    let mut ble = Ble::new_dtm(rng, Irqs).expect("DTM init failed");
+    // Initialize BLE stack
+    let controller = Controller::new(new_controller_state!(8), rng, None, None, Irqs)
+        .await
+        .expect("BLE initialization failed");
+
+    let mut ble = Ble::new_dtm(controller).unwrap();
 
     // DTM packet interval is 625 µs (1 BLE slot) per Vol 6, Part F, Section 4.1.6.
     // Expected packets = duration_s × (1_000_000 µs/s ÷ 625 µs/packet) = duration_s × 1600.
