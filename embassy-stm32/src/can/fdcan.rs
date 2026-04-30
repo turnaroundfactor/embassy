@@ -1065,7 +1065,7 @@ macro_rules! impl_fdcan {
     };
 }
 
-#[cfg(not(can_fdcan_h7, can_fdcan_v2))]
+#[cfg(not(any(can_fdcan_h7, can_fdcan_v2)))]
 foreach_peripheral!(
     (can, FDCAN) => { impl_fdcan!(FDCAN, FDCANRAM); };
     (can, FDCAN1) => { impl_fdcan!(FDCAN1, FDCANRAM1); };
