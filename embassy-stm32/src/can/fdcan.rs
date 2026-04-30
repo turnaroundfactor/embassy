@@ -1065,7 +1065,7 @@ macro_rules! impl_fdcan {
     };
 }
 
-#[cfg(not(can_fdcan_h7))]
+#[cfg(not(can_fdcan_h7, can_fdcan_v2))]
 foreach_peripheral!(
     (can, FDCAN) => { impl_fdcan!(FDCAN, FDCANRAM); };
     (can, FDCAN1) => { impl_fdcan!(FDCAN1, FDCANRAM1); };
@@ -1078,6 +1078,13 @@ foreach_peripheral!(
     (can, FDCAN1) => { impl_fdcan!(FDCAN1, FDCANRAM, 0x0000); };
     (can, FDCAN2) => { impl_fdcan!(FDCAN2, FDCANRAM, 0x0C00); };
     (can, FDCAN3) => { impl_fdcan!(FDCAN3, FDCANRAM, 0x1800); };
+);
+
+#[cfg(can_fdcan_v2)]
+foreach_peripheral!(
+    (can, FDCAN1) => { impl_fdcan!(FDCAN1, FDCANRAM1, 0x0000); };
+    (can, FDCAN2) => { impl_fdcan!(FDCAN2, FDCANRAM1, 0x0C00); };
+    (can, FDCAN3) => { impl_fdcan!(FDCAN3, FDCANRAM1, 0x1800); };
 );
 
 pin_trait!(RxPin, Instance);
