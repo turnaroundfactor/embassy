@@ -615,10 +615,10 @@ impl<'d, M: PeriMode, CM: CommunicationMode> Spi<'d, M, CM> {
         fence(Ordering::SeqCst);
         #[cfg(any(spi_v4, spi_v5, spi_v6))]
         {
-            if regs.cr2().read().tsize() == 0 {
-                while !regs.sr().read().txc() {}
+            if self.info.regs.cr2().read().tsize() == 0 {
+                while !self.info.regs.sr().read().txc() {}
             } else {
-                while !regs.sr().read().eot() {}
+                while !self.info.regs.sr().read().eot() {}
             }
         }
         #[cfg(spi_v3)]
