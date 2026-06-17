@@ -620,9 +620,11 @@ impl<'d, M: PeriMode, CM: CommunicationMode> Spi<'d, M, CM> {
             } else {
                 while !self.info.regs.sr().read().eot() {}
             }
+            while !self.info.regs.sr().read().susp() {}
         }
         #[cfg(spi_v3)]
         while self.info.regs.sr().read().bsy() {}
+        cortex_m::asm::delay(4); 
         Ok(())
     }
 
