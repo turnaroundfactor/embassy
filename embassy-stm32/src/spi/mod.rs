@@ -611,9 +611,12 @@ impl<'d, M: PeriMode, CM: CommunicationMode> Spi<'d, M, CM> {
 
         transfer_words(self.info.regs, words, &[])?;
 
+        fence(Ordering::SeqCst);
         // Wait until transfer is actually complete before returning
         #[cfg(not(any(spi_v1, spi_v2, spi_v3)))]
         while !self.info.regs.sr().read().txc() {}
+        #[cfg(not(any(spi_v1, spi_v2, spi_v3)))]
+        while !self.info.regs.sr().read().eot() {}
         #[cfg(spi_v3)]
         while self.info.regs.sr().read().bsy() {}
         Ok(())
