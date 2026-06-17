@@ -605,7 +605,10 @@ impl<'d, M: PeriMode, CM: CommunicationMode> Spi<'d, M, CM> {
         self.set_word_size(W::CONFIG);
         self.info.regs.cr1().modify(|w| w.set_spe(true));
         flush_rx_fifo(self.info.regs);
-
+        
+        self.info.regs.cr2().modify(|w| {
+            w.set_tsize(words.len() as u16);
+        });
         // Memory barrier after flush RX fifo to ensure register writes complete
         fence(Ordering::SeqCst);
 
