@@ -605,7 +605,8 @@ impl<'d, M: PeriMode, CM: CommunicationMode> Spi<'d, M, CM> {
         self.set_word_size(W::CONFIG);
         self.info.regs.cr1().modify(|w| w.set_spe(true));
         flush_rx_fifo(self.info.regs);
-        
+
+        #[cfg(any(spi_v4, spi_v5, spi_v6))]
         self.info.regs.cr2().modify(|w| {
             w.set_tsize(words.len() as u16);
         });
@@ -615,20 +616,20 @@ impl<'d, M: PeriMode, CM: CommunicationMode> Spi<'d, M, CM> {
         transfer_words(self.info.regs, words, &[])?;
 
         // Wait until transfer is actually complete before returning
-        fence(Ordering::SeqCst);
-        #[cfg(any(spi_v4, spi_v5, spi_v6))]
-        {
-            if self.info.regs.cr2().read().tsize() == 0 {
-                while !self.info.regs.sr().read().txc() {}
-            } else {
-                while !self.info.regs.sr().read().eot() {}
-            }
-            while !self.info.regs.sr().read().susp() {}
-        }
-        #[cfg(spi_v3)]
-        while self.info.regs.sr().read().bsy() {}
-        cortex_m::asm::delay(4); 
-        Ok(())
+        // fence(Ordering::SeqCst);
+        // #[cfg(any(spi_v4, spi_v5, spi_v6))]
+        // {
+        //     if self.info.regs.cr2().read().tsize() == 0 {
+        //         while !self.info.regs.sr().read().txc() {}
+        //     } else {
+        //         while !self.info.regs.sr().read().eot() {}
+        //     }
+        //     while !self.info.regs.sr().read().susp() {}
+        // }
+        // #[cfg(spi_v3)]
+        // while self.info.regs.sr().read().bsy() {}
+        // cortex_m::asm::delay(4); 
+        // Ok(())
     }
 
     /// Blocking in-place bidirectional transfer.
