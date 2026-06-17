@@ -609,13 +609,14 @@ impl<'d, M: PeriMode, CM: CommunicationMode> Spi<'d, M, CM> {
         // Memory barrier after flush RX fifo to ensure register writes complete
         fence(Ordering::SeqCst);
 
-        transfer_words(self.info.regs, words, &[])
+        transfer_words(self.info.regs, words, &[])?;
 
         // Wait until transfer is actually complete before returning
         #[cfg(not(any(spi_v1, spi_v2, spi_v3)))]
         while !self.info.regs.sr().read().txc() {}
         #[cfg(spi_v3)]
         while self.info.regs.sr().read().bsy() {}
+        Ok(())
     }
 
     /// Blocking in-place bidirectional transfer.
