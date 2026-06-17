@@ -613,7 +613,7 @@ impl<'d, M: PeriMode, CM: CommunicationMode> Spi<'d, M, CM> {
         // Memory barrier after flush RX fifo to ensure register writes complete
         fence(Ordering::SeqCst);
 
-        transfer_words(self.info.regs, words, &[])?;
+        transfer_words(self.info.regs, words, &[])
 
         // Wait until transfer is actually complete before returning
         // fence(Ordering::SeqCst);
