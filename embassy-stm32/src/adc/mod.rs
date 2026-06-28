@@ -37,8 +37,6 @@ use crate::pac::adc::vals::SampleTime as Adc4SampleTime;
 
 #[cfg(all(stm32n6, not(lpdma)))]
 use crate::pac::gpdma::vals::Pam;
-#[cfg(all(stm32n6, lpdma))]
-use crate::pac::lpdma::vals::Pam;
 
 #[cfg(any(adc_u5, adc_wba))]
 #[path = "adc4.rs"]
@@ -54,7 +52,7 @@ pub use crate::pac::adc::vals::Res as Resolution;
 pub use crate::pac::adc::vals::SampleTime;
 #[allow(unused_imports)]
 use crate::{peripherals, rcc};
-use crate::dma::TransferOptions;
+use crate::dma::{RequestMode, TransferOptions};
 
 dma_trait!(RxDma, Instance);
 
@@ -404,6 +402,7 @@ impl<'d, T: Instance> Adc<'d, T> {
             secure: true,
             #[cfg(stm32n6)]
             packing: Pam::ZeroExtendOrLeftTruncate,
+            request_mode: RequestMode::Block,
             ..Default::default()
         };
         #[cfg(stm32n6)]
