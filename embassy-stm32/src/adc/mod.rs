@@ -328,7 +328,9 @@ impl<'d, T: Instance> Adc<'d, T> {
         #[cfg(not(stm32n6))]
         return unsafe { core::ptr::read_volatile(T::regs().data()) };
         #[cfg(stm32n6)]
-        unsafe { core::ptr::read_volatile(T::regs().data() as *mut u32) as u16 }
+        unsafe {
+            core::ptr::read_volatile(T::regs().data() as *mut u32) as u16
+        }
     }
 
     /// Read one or multiple ADC regular channels using DMA.
@@ -395,15 +397,19 @@ impl<'d, T: Instance> Adc<'d, T> {
         let transfer = unsafe { dma_channel.read(request, T::regs().data(), readings, Default::default()) };
         #[cfg(stm32n6)]
         let transfer = unsafe {
-            dma_channel.read_raw(request, T::regs().data() as *mut u32, readings, crate::dma::TransferOptions {
-                // DMA will read 0 unless it is marked as secure along with RISUP 64 (ADC12)
-                secure: true,
-                // Don't pack readings into buffer
-                packing: crate::pac::gpdma::vals::Pam::ZeroExtendOrLeftTruncate,
-                ..Default::default()
-            })
+            dma_channel.read_raw(
+                request,
+                T::regs().data() as *mut u32,
+                readings,
+                crate::dma::TransferOptions {
+                    // DMA will read 0 unless it is marked as secure along with RISUP 64 (ADC12)
+                    secure: true,
+                    // Don't pack readings into buffer
+                    packing: crate::pac::gpdma::vals::Pam::ZeroExtendOrLeftTruncate,
+                    ..Default::default()
+                },
+            )
         };
-
 
         // Ensure conversions are finished, even in the event of dropping the future
         let _stop_adc = OnDrop::new(|| T::regs().stop());

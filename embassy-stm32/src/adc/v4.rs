@@ -311,7 +311,6 @@ impl<'d, T: Instance<Regs = crate::pac::adc::Adc>> Adc<'d, T> {
             }
         });
 
-
         #[cfg(not(stm32n6))]
         {
             #[cfg(not(stm32u3))]
@@ -320,13 +319,13 @@ impl<'d, T: Instance<Regs = crate::pac::adc::Adc>> Adc<'d, T> {
                 w.set_adcaldif(Adcaldif::SingleEnded);
                 w.set_adcallin(true);
             });
-    
+
             T::regs().cr().modify(|w| w.set_adcal(true));
-    
+
             while T::regs().cr().read().adcal() {}
-    
+
             block_for_us(1);
-    
+
             T::regs().enable();
         }
 
@@ -370,7 +369,7 @@ impl<'d, T: Instance<Regs = crate::pac::adc::Adc>> Adc<'d, T> {
             T::regs().calfact().modify(|w| w.set_calfact_s(average as u16));
             // 11. Select the calibration input mode by setting ADCALDIF (differential input).
             T::regs().cr().modify(|w| w.set_adcaldif(Adcaldif::Differential));
-            // 12. Keep the same CALADDOS setting as the one obtained during the single-end 
+            // 12. Keep the same CALADDOS setting as the one obtained during the single-end
             // calibration.
             // 13. Repeat steps 4 to 8.
             average = sample_and_average();
