@@ -626,7 +626,7 @@ impl<'d> Channel<'d> {
 
                     let bl: u8 = options.burst_length.into();
                     w.set_sbl_1(bl);
-                    w.set_dbl_1(Burst::_2Beats);
+                    w.set_dbl_1(Burst::_2Beats as u8);
 
                     #[cfg(stm32n6)]
                     {
