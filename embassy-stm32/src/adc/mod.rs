@@ -402,7 +402,7 @@ impl<'d, T: Instance> Adc<'d, T> {
             ..Default::default()
         };
         #[cfg(stm32n6)]
-        let transfer = unsafe { dma_channel.read(request, T::regs().data() as *mut u32, readings, options) as u16 };
+        let transfer = unsafe { dma_channel.read(request, T::regs().data() as *mut u32, readings, options) };
         #[cfg(not(stm32n6))]
         let transfer = unsafe { dma_channel.read(request, T::regs().data(), readings, options) };
 
