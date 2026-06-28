@@ -327,12 +327,10 @@ impl<'d, T: Instance> Adc<'d, T> {
             while !T::regs().wait_done() {}
         }
 
-        unsafe {
-            #[cfg(not(stm32n6))]
-            return core::ptr::read_volatile(T::regs().data());
-            #[cfg(stm32n6)]
-            core::ptr::read_volatile(T::regs().data() as *mut u32) as u16
-        }
+        #[cfg(not(stm32n6))]
+        return unsafe { core::ptr::read_volatile(T::regs().data()) };
+        #[cfg(stm32n6)]
+        unsafe { core::ptr::read_volatile(T::regs().data() as *mut u32) as u16 }
     }
 
     /// Read one or multiple ADC regular channels using DMA.
@@ -399,10 +397,12 @@ impl<'d, T: Instance> Adc<'d, T> {
             // DMA will read 0 unless it is marked as secure along with RISUP 64 (ADC12)
             #[cfg(stm32n6)]
             secure: true,
+            #[cfg(stm32n6)]
+            packing: vals::Pam::ZeroExtendOrLeftTruncate,
             ..Default::default()
         };
         #[cfg(stm32n6)]
-        let transfer = unsafe { dma_channel.read(request, T::regs().data() as *mut u32, readings, options) };
+        let transfer = unsafe { dma_channel.read_raw(request, T::regs().data() as *mut u32, readings, options) };
         #[cfg(not(stm32n6))]
         let transfer = unsafe { dma_channel.read(request, T::regs().data(), readings, options) };
 
