@@ -402,7 +402,7 @@ impl<'d, T: Instance> Adc<'d, T> {
             secure: true,
             #[cfg(stm32n6)]
             packing: Pam::ZeroExtendOrLeftTruncate,
-            burst_length: Burst::_2Beats,
+            // burst_length: Burst::_2Beats,
             ..Default::default()
         };
         #[cfg(stm32n6)]
