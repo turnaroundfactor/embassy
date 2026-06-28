@@ -35,6 +35,11 @@ use crate::pac::adc::vals::Adc4SampleTime;
 #[cfg(adc_wba)]
 use crate::pac::adc::vals::SampleTime as Adc4SampleTime;
 
+#[cfg(all(stm32n6, not(lpdma)))]
+use crate::pac::gpdma::vals;
+#[cfg(all(stm32n6, lpdma))]
+use crate::pac::lpdma::vals;
+
 #[cfg(any(adc_u5, adc_wba))]
 #[path = "adc4.rs"]
 pub mod adc4;
