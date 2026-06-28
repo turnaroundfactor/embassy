@@ -53,10 +53,6 @@ use crate::dma::TransferOptions;
 
 dma_trait!(RxDma, Instance);
 
-#[cfg(not(stm32n6))]
-pub type DataSize = u16;
-#[cfg(stm32n6)]
-pub type DataSize = u32;
 
 #[cfg(not(any(adc_v2, adc_g4, adc_g0, adc_c0, adc_f3v1, adc_wba, adc_u5)))]
 /// Trigger edge stub.
@@ -160,7 +156,7 @@ trait AdcRegs: BasicAdcRegs {
     fn wait_done(&self) -> bool;
     fn configure_dma(&self, conversion_mode: ConversionMode);
     fn configure_sequence(&self, sequence: impl ExactSizeIterator<Item = ((u8, bool), Self::SampleTime)>);
-    fn data(&self) -> *mut DataSize;
+    fn data(&self) -> *mut u16;
 }
 
 #[cfg(any(adc_v2, adc_g4))]
@@ -169,7 +165,7 @@ trait InjectedRegs: AdcRegs {
     fn configure_injected_trigger(&self, trigger: (u8, Exten), interrupt: bool);
     fn start_injected(&self);
     fn stop_injected(&self);
-    fn read_injected(&self, data: &mut [DataSize]);
+    fn read_injected(&self, data: &mut [u16]);
 }
 
 #[cfg(any(adc_v2, adc_g4))]
@@ -279,7 +275,7 @@ impl<'d, T: Instance> Adc<'d, T> {
         &mut self,
         channel: impl BorrowedChannel<'a, T>,
         sample_time: <T::Regs as BasicAdcRegs>::SampleTime,
-    ) -> DataSize {
+    ) -> u16 {
         use core::sync::atomic::{Ordering, compiler_fence};
         use core::task::Poll;
 
@@ -315,7 +311,7 @@ impl<'d, T: Instance> Adc<'d, T> {
         &mut self,
         channel: impl BorrowedChannel<'a, T>,
         sample_time: <T::Regs as BasicAdcRegs>::SampleTime,
-    ) -> DataSize {
+    ) -> u16 {
         let channel = channel.reborrow_adc();
 
         T::regs().stop();
@@ -331,7 +327,12 @@ impl<'d, T: Instance> Adc<'d, T> {
             while !T::regs().wait_done() {}
         }
 
-        unsafe { core::ptr::read_volatile(T::regs().data()) }
+        unsafe {
+            #[cfg(not(stm32n6))]
+            return core::ptr::read_volatile(T::regs().data());
+            #[cfg(stm32n6)]
+            core::ptr::read_volatile(T::regs().data() as *mut u32) as u16
+        }
     }
 
     /// Read one or multiple ADC regular channels using DMA.
@@ -375,7 +376,7 @@ impl<'d, T: Instance> Adc<'d, T> {
         irq: impl crate::interrupt::typelevel::Binding<D::Interrupt, crate::dma::InterruptHandler<D>> + 'a,
         sequence: impl ExactSizeIterator<Item = (BorrowedAdcChannel<'ch, T>, <T::Regs as BasicAdcRegs>::SampleTime)>,
         trigger: Option<RegularAdcTrigger<T>>,
-        readings: &mut [DataSize],
+        readings: &mut [u16],
     ) {
         let _scoped_wake_guard = <T as crate::rcc::SealedRccPeripheral>::RCC_INFO.wake_guard();
 
@@ -400,7 +401,11 @@ impl<'d, T: Instance> Adc<'d, T> {
             secure: true,
             ..Default::default()
         };
+        #[cfg(stm32n6)]
+        let transfer = unsafe { dma_channel.read(request, T::regs().data() as *mut u32, readings, options) as u16 };
+        #[cfg(not(stm32n6))]
         let transfer = unsafe { dma_channel.read(request, T::regs().data(), readings, options) };
+
 
         // Ensure conversions are finished, even in the event of dropping the future
         let _stop_adc = OnDrop::new(|| T::regs().stop());
@@ -575,7 +580,7 @@ impl<'d, T: Instance> Adc<'d, T> {
     pub fn into_ring_buffered<'a, 'ch, D: RxDma<T>>(
         self,
         dma: embassy_hal_internal::Peri<'a, D>,
-        dma_buf: &'a mut [DataSize],
+        dma_buf: &'a mut [u16],
         irq: impl crate::interrupt::typelevel::Binding<D::Interrupt, crate::dma::InterruptHandler<D>> + 'a,
         sequence: impl ExactSizeIterator<Item = (BorrowedAdcChannel<'ch, T>, <T::Regs as BasicAdcRegs>::SampleTime)>,
         trigger: Option<RegularAdcTrigger<T>>,
@@ -685,7 +690,7 @@ impl<'d, T: Instance<Regs: InjectedAdcRegs>> Adc<'d, T> {
     pub fn into_ring_buffered_and_injected<'a, 'b, const N: usize, D: RxDma<T>>(
         self,
         dma: embassy_hal_internal::Peri<'a, D>,
-        dma_buf: &'a mut [DataSize],
+        dma_buf: &'a mut [u16],
         _irq: impl crate::interrupt::typelevel::Binding<D::Interrupt, crate::dma::InterruptHandler<D>> + 'a,
         regular_sequence: impl ExactSizeIterator<Item = (BorrowedAdcChannel<'a, T>, <T::Regs as BasicAdcRegs>::SampleTime)>,
         regular_trigger: Option<RegularAdcTrigger<T>>,
@@ -761,7 +766,7 @@ impl VrefInt {
         stm32wl
     ))]
     /// The value that vref would be if vdda was at the factory calibration voltage `VREF_CALIB_MV`.
-    pub fn calibrated_value(&self) -> DataSize {
+    pub fn calibrated_value(&self) -> u16 {
         crate::pac::VREFINTCAL.data().read()
     }
 }
