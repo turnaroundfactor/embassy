@@ -36,9 +36,9 @@ use crate::pac::adc::vals::Adc4SampleTime;
 use crate::pac::adc::vals::SampleTime as Adc4SampleTime;
 
 #[cfg(all(stm32n6, not(lpdma)))]
-use crate::pac::gpdma::vals;
+use crate::pac::gpdma::vals::Pam;
 #[cfg(all(stm32n6, lpdma))]
-use crate::pac::lpdma::vals;
+use crate::pac::lpdma::vals::Pam;
 
 #[cfg(any(adc_u5, adc_wba))]
 #[path = "adc4.rs"]
@@ -403,7 +403,7 @@ impl<'d, T: Instance> Adc<'d, T> {
             #[cfg(stm32n6)]
             secure: true,
             #[cfg(stm32n6)]
-            packing: vals::Pam::ZeroExtendOrLeftTruncate,
+            packing: Pam::ZeroExtendOrLeftTruncate,
             ..Default::default()
         };
         #[cfg(stm32n6)]
