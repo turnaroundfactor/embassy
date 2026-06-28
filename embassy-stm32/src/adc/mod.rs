@@ -35,9 +35,6 @@ use crate::pac::adc::vals::Adc4SampleTime;
 #[cfg(adc_wba)]
 use crate::pac::adc::vals::SampleTime as Adc4SampleTime;
 
-#[cfg(all(stm32n6, not(lpdma)))]
-use crate::pac::gpdma::vals::Pam;
-
 #[cfg(any(adc_u5, adc_wba))]
 #[path = "adc4.rs"]
 pub mod adc4;
@@ -52,10 +49,8 @@ pub use crate::pac::adc::vals::Res as Resolution;
 pub use crate::pac::adc::vals::SampleTime;
 #[allow(unused_imports)]
 use crate::{peripherals, rcc};
-use crate::dma::{Burst, RequestMode, TransferOptions};
 
 dma_trait!(RxDma, Instance);
-
 
 #[cfg(not(any(adc_v2, adc_g4, adc_g0, adc_c0, adc_f3v1, adc_wba, adc_u5)))]
 /// Trigger edge stub.
@@ -396,19 +391,18 @@ impl<'d, T: Instance> Adc<'d, T> {
 
         let request = rx_dma.request();
         let mut dma_channel = crate::dma::Channel::new(rx_dma, irq);
-        let options = TransferOptions {
-            // DMA will read 0 unless it is marked as secure along with RISUP 64 (ADC12)
-            #[cfg(stm32n6)]
-            secure: true,
-            #[cfg(stm32n6)]
-            packing: Pam::ZeroExtendOrLeftTruncate,
-            // burst_length: Burst::_2Beats,
-            ..Default::default()
-        };
-        #[cfg(stm32n6)]
-        let transfer = unsafe { dma_channel.read_raw(request, T::regs().data() as *mut u32, readings, options) };
         #[cfg(not(stm32n6))]
-        let transfer = unsafe { dma_channel.read(request, T::regs().data(), readings, options) };
+        let transfer = unsafe { dma_channel.read(request, T::regs().data(), readings, Default::default()) };
+        #[cfg(stm32n6)]
+        let transfer = unsafe {
+            dma_channel.read_raw(request, T::regs().data() as *mut u32, readings, crate::dma::TransferOptions {
+                // DMA will read 0 unless it is marked as secure along with RISUP 64 (ADC12)
+                secure: true,
+                // Don't pack readings into buffer
+                packing: crate::pac::gpdma::vals::Pam::ZeroExtendOrLeftTruncate,
+                ..Default::default()
+            })
+        };
 
 
         // Ensure conversions are finished, even in the event of dropping the future
