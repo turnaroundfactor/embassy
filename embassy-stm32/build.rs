@@ -1957,7 +1957,7 @@ fn main() {
                 if p.name == "XSPIM" {
                     if chip_name.starts_with("stm32n6") {
                         for controller in 1..=3 {
-                            peri = format_ident!("XSPI{}", controller);
+                            peri = format_ident!("XSPI{}", controller.to_string());
                             g.extend(quote! {
                                 pin_trait_impl!(#tr, #peri, #pin_name, #af);
                             });
