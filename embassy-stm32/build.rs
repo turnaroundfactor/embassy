@@ -1955,7 +1955,14 @@ fn main() {
 
                 // XSPIM  is special
                 if p.name == "XSPIM" {
-                    if pin.signal.starts_with("P1") {
+                    if chip_name.starts_with("stm32n6") {
+                        for controller in 1..=3 {
+                            peri = format_ident!("XSPI{}", controller);
+                            g.extend(quote! {
+                                pin_trait_impl!(#tr, #peri, #pin_name, #af);
+                            });
+                        }
+                    } else if pin.signal.starts_with("P1") {
                         peri = format_ident!("{}", "XSPI1");
                     } else if pin.signal.starts_with("P2") {
                         peri = format_ident!("{}", "XSPI2");
@@ -2031,7 +2038,7 @@ fn main() {
                         quote!()
                     };
 
-                    if p.name == "OCTOSPIM" && (pin.signal.starts_with("P1_") || pin.signal.starts_with("P2_")) {
+                    if (p.name == "OCTOSPIM" && (pin.signal.starts_with("P1_") || pin.signal.starts_with("P2_"))) || (p.name == "XSPIM" && chip_name.starts_with("stm32n6")) {
                         // already handled above
                         None
                     } else {
