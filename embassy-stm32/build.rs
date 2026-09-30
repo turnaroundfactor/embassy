@@ -1956,6 +1956,7 @@ fn main() {
                 // XSPIM  is special
                 if p.name == "XSPIM" {
                     if chip_name.starts_with("stm32n6") {
+                        // Map all XSPI controllers
                         for controller in 1..=3 {
                             peri = format_ident!("XSPI{}", controller.to_string());
                             g.extend(quote! {
@@ -1978,15 +1979,35 @@ fn main() {
 
                 // XSPI NCS pin to CSSEL mapping
                 if pin.signal.ends_with("NCS1") {
-                    g.extend(quote! {
-                        sel_trait_impl!(crate::xspi::NCSEither, #peri, #pin_name, 0);
-                    })
+                    if chip_name.starts_with("stm32n6") {
+                        for controller in 1..=3 {
+                                peri = format_ident!("XSPI{}", controller.to_string());
+                                g.extend(quote! {
+                                    sel_trait_impl!(crate::xspi::NCSEither, #peri, #pin_name, 0);
+                                })
+                            }
+                    } else {
+                        g.extend(quote! {
+                            sel_trait_impl!(crate::xspi::NCSEither, #peri, #pin_name, 0);
+                        })
+                    }
                 }
                 if pin.signal.ends_with("NCS2") {
-                    g.extend(quote! {
-                        sel_trait_impl!(crate::xspi::NCSEither, #peri, #pin_name, 1);
-                    })
+                    if chip_name.starts_with("stm32n6") {
+                        for controller in 1..=3 {
+                                peri = format_ident!("XSPI{}", controller.to_string());
+                                g.extend(quote! {
+                                    sel_trait_impl!(crate::xspi::NCSEither, #peri, #pin_name, 1);
+                                })
+                            }
+                    } else {
+                        g.extend(quote! {
+                            sel_trait_impl!(crate::xspi::NCSEither, #peri, #pin_name, 1);
+                        })
+                    }
                 }
+                
+                
 
                 // Many families have USB as an additional function, not an
                 // alternate function, where the pin must be left in analog
