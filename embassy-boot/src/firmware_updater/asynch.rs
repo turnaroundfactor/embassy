@@ -176,6 +176,36 @@ impl<'d, DFU: NorFlash, STATE: NorFlash> FirmwareUpdater<'d, DFU, STATE> {
         Ok(())
     }
 
+    /// Erase data from the DFU storage peripheral, starting the erase
+    /// operation at the given address from, and erasing until to.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if:
+    ///
+    /// - The device is not in a proper state to receive firmware updates (e.g., not booted).
+    /// - There is a failure erasing a sector before writing.
+    pub async fn erase_dfu(&mut self, from: u32, to: u32) -> Result<(), FirmwareUpdaterError> {
+        self.state.verify_booted().await?;
+        self.dfu.erase(from, to).await?;
+        Ok(())
+    }
+
+    /// Write a slice of data to the DFU storage peripheral, starting the write
+    /// operation at the given address offset, and writting `buf.len()` bytes.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if:
+    ///
+    /// - The device is not in a proper state to receive firmware updates (e.g., not booted).
+    /// - There is a failure writing data to the device.
+    pub async fn write_dfu(&mut self, offset: u32, buf: &[u8]) -> Result<(), FirmwareUpdaterError> {
+        self.state.verify_booted().await?;
+        self.dfu.write(offset, buf).await?;
+        Ok(())
+    }
+
     /// Mark to trigger firmware swap on next boot.
     ///
     /// With signature support enabled, verify first or use a verifying bootloader.
