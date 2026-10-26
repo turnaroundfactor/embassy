@@ -565,6 +565,25 @@ impl<'d, T: Instance, M: PeriMode> Xspi<'d, T, M> {
 
         // Set information required to initiate transaction
         if let Some(instruction) = command.instruction {
+            // H7RS and N6: When DHQC is enabled and instruction is in DTR mode with
+            // no data phase, DDTR must be enabled for proper timing (XSPI hardware
+            // requirement).
+            //
+            // The details are explained further, for the OSPI but still apllicable,
+            // here: <https://github.com/embassy-rs/embassy/pull/6441>
+            //
+            // In summary: DDTR must be set for no-data commands. With DHQC is enabled,
+            // the CCR register DDTR bit gates the quarter-cycle delay logic, so even
+            // instruction-only / instruction + address commands must set it, or they
+            // silently no-op. (ST's HAL sets DDTR for these cases.) However, reads keep
+            // working without this.
+            #[cfg(any(stm32h7rs, stm32n6))]
+            if data_len.is_none() && self.config.delay_hold_quarter_cycle && command.idtr {
+                T::REGS.ccr().modify(|w| {
+                    w.set_ddtr(true);
+                });
+            }
+            
             if let Some(address) = command.address {
                 T::REGS.ir().write(|v| {
                     v.set_instruction(instruction);
@@ -574,25 +593,6 @@ impl<'d, T: Instance, M: PeriMode> Xspi<'d, T, M> {
                     v.set_address(address);
                 });
             } else {
-                // H7RS and N6: When DHQC is enabled and instruction is in DTR mode with
-                // no data phase, DDTR must be enabled for proper timing (XSPI hardware
-                // requirement).
-                //
-                // The details are explained further, for the OSPI but still apllicable,
-                // here: <https://github.com/embassy-rs/embassy/pull/6441>
-                //
-                // In summary: DDTR must be set for no-data commands. With DHQC is enabled,
-                // the CCR register DDTR bit gates the quarter-cycle delay logic, so even
-                // instruction-only / instruction + address commands must set it, or they
-                // silently no-op. (ST's HAL sets DDTR for these cases.) However, reads keep
-                // working without this.
-                #[cfg(any(stm32h7rs, stm32n6))]
-                if data_len.is_none() && self.config.delay_hold_quarter_cycle && command.idtr {
-                    T::REGS.ccr().modify(|w| {
-                        w.set_ddtr(true);
-                    });
-                }
-
                 T::REGS.ir().write(|v| {
                     v.set_instruction(instruction);
                 });
